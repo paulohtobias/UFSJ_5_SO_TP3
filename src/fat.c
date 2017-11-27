@@ -64,11 +64,16 @@ data_cluster *get_data_cluster(dir_entry_t *entry){
 	return &clusters[entry->first_block - FIRST_BLOCK];
 }
 
-dir_entry_t *search_file(char *pathname){
+dir_entry_t *search_file(const char *pathname){
 	const char delim[2] = "/";
 	char *token;
 
-	token = strtok(pathname, delim);
+	/* Copying the string to a temp. */
+	size_t len = strlen(pathname);
+	char *pathname_c = malloc(len + 1);
+	strcpy(pathname_c, pathname);
+
+	token = strtok(pathname_c, delim);
 
 	int i;
 	dir_entry_t *current_dir = root_dir;
@@ -105,7 +110,7 @@ dir_entry_t *search_file(char *pathname){
 	return NULL;
 }
 
-void stat(char *pathname){
+void stat(const char *pathname){
 	dir_entry_t *dir_entry = search_file(pathname);
 
 	if(dir_entry != NULL){
@@ -118,14 +123,23 @@ void stat(char *pathname){
 	}
 }
 
-void ls(char *pathname){
-	dir_entry_t *dir = search_file(pathname);
+void ls(const char *pathname){
+	dir_entry_t *dir_entry = search_file(pathname);
 
-	if(dir == NULL){
-		printf("%s not found.\n");
+	/* Error checking. */
+	if(dir_entry == NULL){
+		printf("%s not found.\n", pathname);
 		return;
 	}
-	if(dir->attributes == ATTR_FILE){
-		printf("%s is a file");
+	if(dir_entry->attributes == ATTR_FILE){
+		printf("%s is a file.\n", pathname);
+		return;
+	}
+
+	dir_entry_t *dir = get_data_cluster(dir_entry)->dir;
+
+	int i;
+	for(i = 0; i < dir_entry->size; i++){
+		printf("%s\n", dir[i].filename);
 	}
 }

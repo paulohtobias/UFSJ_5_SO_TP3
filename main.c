@@ -2,8 +2,8 @@
 
 int main(int argc, char *argv[]){
 	init();
-	stat(argv[1]);
-	
+	ls(argv[1]);
+
 	//init();
 	
 	/*dir_entry_t arquivo;

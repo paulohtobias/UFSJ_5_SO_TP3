@@ -1,0 +1,3 @@
+ * manter lista de blocos livres (usar lista encadeada).
+ * incluir . e .. na lista de diretórios.
+ ? resolver caminhos relativos.
