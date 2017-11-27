@@ -12,12 +12,7 @@ endif
 #Directories
 IDIR = ./include
 SDIR = ./src
-
-ifeq ($(OS),Windows_NT)
-	ODIR = ./obj/windows
-else
-	ODIR = ./obj/linux
-endif
+ODIR = ./obj
 
 #Files
 SOURCE = .c
@@ -27,8 +22,8 @@ INCLUDE_PATHS = -I$(IDIR)
 
 #Libraries
 LIBS = 
-CFLAGS+= `pkg-config --cflags $(LIBS)`
-LIBRARIES = `pkg-config --libs $(LIBS)`
+#CFLAGS+= `pkg-config --cflags $(LIBS)`
+#LIBRARIES = `pkg-config --libs $(LIBS)`
 
 #Compilation line
 COMPILE = $(CC) $(CFLAGS) $(INCLUDE_PATHS)
