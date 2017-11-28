@@ -61,10 +61,18 @@ void load(void){
 }
 
 data_cluster *get_data_cluster(dir_entry_t *entry){
+	if(entry->first_block == 0x09){
+		return &clusters[0];
+	}
 	return &clusters[entry->first_block - FIRST_BLOCK];
 }
 
 dir_entry_t *search_file(const char *pathname){
+	/* Se paathname for '/', então não precisa ser procurado. */
+	if(strcmp(pathname, "/") == 0){
+		return &root_dir_info;
+	}
+	
 	const char delim[2] = "/";
 	char *token;
 
