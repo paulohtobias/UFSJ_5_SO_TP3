@@ -55,8 +55,4 @@ data_cluster *get_data_cluster(dir_entry_t *entry);
 
 dir_entry_t *search_file(const char *pathname);
 
-void stat(const char *pathname);
-
-void ls(const char *pathname);
-
 #endif /* FAT_H */

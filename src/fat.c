@@ -23,7 +23,7 @@ void init(void){
 	root_dir_info.size = 1;
 	fat[i++] = END_OF_FILE;
 	
-	/* Test. */
+	/* Teste. */
 	memcpy(root_dir[0].filename, "dir1", 5);
 	root_dir[0].attributes = ATTR_DIR;
 	root_dir[0].first_block = 0x0a;
@@ -40,7 +40,7 @@ void init(void){
 		fat[i++] = FREE_CLUSTER;
 	}
 	
-	/* Writing to disk. */
+	/* Escrevendo no disco. */
 	fwrite(&boot_block, sizeof(boot_block), 1, ptr_file);
 	fwrite(&fat, sizeof(fat), 1, ptr_file);
 	fwrite(&root_dir, sizeof(root_dir), 1, ptr_file);
@@ -53,7 +53,7 @@ void load(void){
 	FILE *ptr_file;
 	ptr_file = fopen(fat_name, "rb");
 	
-	/* Reading from disk. */
+	/* Lendo do disco. */
 	fseek(ptr_file, sizeof(boot_block), SEEK_SET);
 	fread(fat, sizeof(fat), 1, ptr_file);
 	fread(root_dir, sizeof(root_dir), 1, ptr_file);
@@ -68,7 +68,7 @@ dir_entry_t *search_file(const char *pathname){
 	const char delim[2] = "/";
 	char *token;
 
-	/* Copying the string to a temp. */
+	/* Copiando a string para uma temporária. */
 	size_t len = strlen(pathname);
 	char *pathname_c = malloc(len + 1);
 	strcpy(pathname_c, pathname);
@@ -108,38 +108,4 @@ dir_entry_t *search_file(const char *pathname){
 	}
 
 	return NULL;
-}
-
-void stat(const char *pathname){
-	dir_entry_t *dir_entry = search_file(pathname);
-
-	if(dir_entry != NULL){
-		printf("  File: '%s'\n"
-				"  Size: %d \t Tipo: %s\n"
-				"  First Block: 0x%02x (%d)\n",
-				dir_entry->filename, dir_entry->size,
-				(dir_entry->attributes == ATTR_DIR)?"Directory":"File",
-				dir_entry->first_block, dir_entry->first_block);
-	}
-}
-
-void ls(const char *pathname){
-	dir_entry_t *dir_entry = search_file(pathname);
-
-	/* Error checking. */
-	if(dir_entry == NULL){
-		printf("%s not found.\n", pathname);
-		return;
-	}
-	if(dir_entry->attributes == ATTR_FILE){
-		printf("%s is a file.\n", pathname);
-		return;
-	}
-
-	dir_entry_t *dir = get_data_cluster(dir_entry)->dir;
-
-	int i;
-	for(i = 0; i < dir_entry->size; i++){
-		printf("%s\n", dir[i].filename);
-	}
 }
