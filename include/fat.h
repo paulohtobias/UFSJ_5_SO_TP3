@@ -35,7 +35,7 @@ typedef struct _dir_entry_t dir_entry_t;
 
 union _data_cluster{
 	dir_entry_t dir[ENTRY_BY_CLUSTER];
-	uint8_t data;
+	uint8_t data[CLUSTER_SIZE];
 };
 
 typedef union _data_cluster data_cluster;
