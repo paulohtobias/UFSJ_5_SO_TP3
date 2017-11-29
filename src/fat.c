@@ -17,34 +17,28 @@ void init(void){
 	}
 	
 	/* Cluster 9: root dir */
-	memcpy(root_dir_info.filename, "/", 2);
-	root_dir_info.attributes = ATTR_DIR;
-	root_dir_info.first_block = 0x09;
-	root_dir_info.size = 1;
-	fat[i++] = END_OF_FILE;
-	
-	/* Teste. */
-	memcpy(root_dir[0].filename, "dir1", 5);
+	memcpy(root_dir[0].filename, ".", 2);
 	root_dir[0].attributes = ATTR_DIR;
-	root_dir[0].first_block = 0x0a;
-	root_dir[0].size = 1;
-	fat[i++] = END_OF_FILE;
+	root_dir[0].first_block = 0x09;
+	root_dir[0].size = CLUSTER_SIZE;
 
-	memcpy(clusters[0].dir[0].filename, "file1", 6);
-	clusters[0].dir[0].attributes = ATTR_FILE;
-	clusters[0].dir[0].first_block = 0x0b;
-	clusters[0].dir[0].size = 15;
-	memcpy(&clusters[1].data, "abcdefghijklmn", 15);
+	memcpy(root_dir[1].filename, "..", 3);
+	root_dir[1].attributes = ATTR_DIR;
+	root_dir[1].first_block = 0x09;
+	root_dir[1].size = CLUSTER_SIZE;
+
+	/* Current dir começa com '/' */
+	g_current_dir = root_dir;
 
 	while(i < NUM_CLUSTER){
 		fat[i++] = FREE_CLUSTER;
 	}
 	
 	/* Escrevendo no disco. */
-	fwrite(&boot_block, sizeof(boot_block), 1, ptr_file);
-	fwrite(&fat, sizeof(fat), 1, ptr_file);
-	fwrite(&root_dir, sizeof(root_dir), 1, ptr_file);
-	fwrite(&clusters, sizeof(clusters), 1, ptr_file);
+	fwrite(boot_block, sizeof(boot_block), 1, ptr_file);
+	fwrite(fat, sizeof(fat), 1, ptr_file);
+	fwrite(root_dir, sizeof(root_dir), 1, ptr_file);
+	fwrite(clusters, sizeof(clusters), 1, ptr_file);
 
 	fclose(ptr_file);
 }
@@ -61,16 +55,49 @@ void load(void){
 }
 
 data_cluster *get_data_cluster(dir_entry_t *entry){
+	/* Lendo os dados no disco. */
+	FILE *file_ptr = fopen(fat_name, "rb");
+	
+	fseek(file_ptr, entry->first_block * sizeof(data_cluster), SEEK_SET);
+	
+	data_cluster *cluster;
+	
 	if(entry->first_block == 0x09){
-		return &clusters[0];
+		cluster = (data_cluster *)root_dir;
+	}else{
+		//TO-DO: usar a FAT pra ler mais clusters caso o arquivo seja grande.
+		cluster = &clusters[entry->first_block - FIRST_BLOCK];
 	}
-	return &clusters[entry->first_block - FIRST_BLOCK];
+	
+	fread(cluster, sizeof(data_cluster), 1, file_ptr);
+	fclose(file_ptr);
+	
+	return cluster;
+}
+
+void set_entry(dir_entry_t *entry, const char *filename, uint8_t attributes, uint16_t first_block, uint32_t size){
+	strncpy(entry->filename, filename, 18);
+	entry->attributes = attributes;
+	memset(entry->reserved, 0, 7);
+	entry->first_block = first_block;
+	entry->size = size;
+	
+	/* Atualizando a partição. */
+	FILE *file_ptr = fopen(fat_name, "rb+");
+	fseek(file_ptr, sizeof(boot_block) + sizeof(fat), SEEK_SET);
+	if(entry < clusters[0].dir){
+		fseek(file_ptr, (entry - root_dir) * sizeof(*entry), SEEK_CUR);
+	}else{
+		fseek(file_ptr, sizeof(root_dir) + (entry - clusters[0].dir) * sizeof(*entry), SEEK_CUR);
+	}
+	fwrite(entry, sizeof(*entry), 1, file_ptr);
+	fclose(file_ptr);
 }
 
 dir_entry_t *search_file(const char *pathname){
 	/* Se paathname for '/', então não precisa ser procurado. */
 	if(strcmp(pathname, "/") == 0){
-		return &root_dir_info;
+		return &root_dir[0];
 	}
 	
 	const char delim[2] = "/";
@@ -84,8 +111,7 @@ dir_entry_t *search_file(const char *pathname){
 	token = strtok(pathname_c, delim);
 
 	int i;
-	dir_entry_t *current_dir = root_dir;
-	int size = root_dir_info.size;
+	dir_entry_t *current_dir = g_current_dir;
 
 	char *search_name = token;
 	while(token != NULL){
@@ -93,7 +119,7 @@ dir_entry_t *search_file(const char *pathname){
 
 		/* Procurando por search_name. */
 		int found = 0;
-		for(i = 0; i < size; i++){
+		for(i = 0; i < ENTRY_BY_CLUSTER; i++){
 			if(strcmp(current_dir[i].filename, search_name) == 0){
 				found = 1;
 				if(token == NULL){
@@ -101,7 +127,6 @@ dir_entry_t *search_file(const char *pathname){
 				}
 				/* Se token != NULL, então a árvore de caminhos ainda não foi totalmente percorrida. */
 				else{
-					size = current_dir[i].size;
 					current_dir = get_data_cluster(&current_dir[i])->dir;
 					break;
 				}

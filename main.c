@@ -2,7 +2,24 @@
 
 int main(int argc, char *argv[]){
 	init();
-	ls(argv[1]);
+	
+	int i;
+	char name[18];
+	ls(".");
+	for(i=0; i<33; i++){
+		sprintf(name, "/subdir %d", i);
+		mkdir(name);
+		ls(".");
+		getchar();
+	}
+	
+	set_entry(&clusters[0].dir[2], "file1", ATTR_FILE, 0x0b, 15);
+	memcpy(&clusters[1].data, "abcdefghijklmn", 15);
+	
+	cd("subdir 0");
+	ls(".");
+	
+	stat("file1");
 
 	//init();
 	

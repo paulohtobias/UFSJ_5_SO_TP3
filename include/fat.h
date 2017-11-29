@@ -44,7 +44,7 @@ typedef union _data_cluster data_cluster;
 uint8_t boot_block[CLUSTER_SIZE];
 uint16_t fat[NUM_CLUSTER];
 dir_entry_t root_dir[ENTRY_BY_CLUSTER];
-dir_entry_t root_dir_info;
+dir_entry_t *g_current_dir;
 data_cluster clusters[4086];
 
 void init(void);
@@ -52,6 +52,8 @@ void init(void);
 void load(void);
 
 data_cluster *get_data_cluster(dir_entry_t *entry);
+
+void set_entry(dir_entry_t *entry, const char *filename, uint8_t attributes, uint16_t first_block, uint32_t size);
 
 dir_entry_t *search_file(const char *pathname);
 
