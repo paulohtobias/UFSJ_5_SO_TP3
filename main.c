@@ -10,16 +10,21 @@ int main(int argc, char *argv[]){
 		sprintf(name, "/subdir %d", i);
 		mkdir(name);
 		ls(".");
-		getchar();
+		//getchar();
 	}
 	
-	set_entry(&clusters[0].dir[2], "file1", ATTR_FILE, 0x0b, 15);
-	memcpy(&clusters[1].data, "abcdefghijklmn", 15);
+	set_entry(&clusters[0].dir[2], "file1", ATTR_FILE, fat_get_free_cluster(), 15);
+	memcpy(&clusters[fat_get_free_cluster()].data, "abcdefghijklmn", 15);
 	
 	cd("subdir 0");
 	ls(".");
 	
 	stat("file1");
+	
+	cd("..");
+	ls(".");
+	
+	stat("subdir 5");
 
 	//init();
 	

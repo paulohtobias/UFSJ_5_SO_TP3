@@ -9,11 +9,11 @@ void init(void){
 	for(i = 0; i < CLUSTER_SIZE; ++i){
 		boot_block[i] = 0xbb;
 	}
-	fat[0] = BOOT_BLOCK;
+	fat[0] = BOOT_CLUSTER;
 
 	/* Clusters 1-8: FAT */
 	for(i = 1; i <= 8; ++i){
-		fat[i] = FAT_BLOCK;
+		fat[i] = FAT_CLUSTER;
 	}
 	
 	/* Cluster 9: root dir */
@@ -54,6 +54,15 @@ void load(void){
 	fclose(ptr_file);
 }
 
+uint16_t fat_get_free_cluster(void){
+	uint16_t i;
+	for(i = FIRST_CLUSTER; i < sizeof(fat) && fat[i] != FREE_CLUSTER; i++);
+	if(i == sizeof(fat)){
+		return -1;
+	}
+	return i - FIRST_CLUSTER;
+}
+
 data_cluster *get_data_cluster(dir_entry_t *entry){
 	/* Lendo os dados no disco. */
 	FILE *file_ptr = fopen(fat_name, "rb");
@@ -66,7 +75,7 @@ data_cluster *get_data_cluster(dir_entry_t *entry){
 		cluster = (data_cluster *)root_dir;
 	}else{
 		//TO-DO: usar a FAT pra ler mais clusters caso o arquivo seja grande.
-		cluster = &clusters[entry->first_block - FIRST_BLOCK];
+		cluster = &clusters[entry->first_block - FIRST_CLUSTER];
 	}
 	
 	fread(cluster, sizeof(data_cluster), 1, file_ptr);

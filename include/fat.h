@@ -14,11 +14,10 @@
 #define NUM_CLUSTER 4096
 #define fat_name "fat.part"
 
-#define FIRST_BLOCK (0x0a)
+#define FIRST_CLUSTER (0x0a)
 #define FREE_CLUSTER 0x0000
-#define BOOT_BLOCK 0xfffd
-#define FAT_BLOCK 0xfffe
-#define END_OF_FILE 0xffff
+#define BOOT_CLUSTER 0xfffd
+#define FAT_CLUSTER 0xfffe
 
 #define ATTR_FILE 0
 #define ATTR_DIR 1
@@ -50,6 +49,8 @@ data_cluster clusters[4086];
 void init(void);
 
 void load(void);
+
+uint16_t fat_get_free_cluster(void);
 
 data_cluster *get_data_cluster(dir_entry_t *entry);
 
