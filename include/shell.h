@@ -11,4 +11,6 @@ void ls(const char *pathname);
 
 void mkdir(const char *pathname);
 
+void shell(const char *funcao, const char *arg);
+
 #endif /* SHELL_H */

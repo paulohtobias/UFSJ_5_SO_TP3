@@ -50,6 +50,8 @@ void init(void);
 
 void load(void);
 
+void write_to_disk(void);
+
 uint16_t fat_get_free_cluster(void);
 
 data_cluster *get_data_cluster(dir_entry_t *entry);

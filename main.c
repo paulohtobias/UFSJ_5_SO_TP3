@@ -1,8 +1,8 @@
 #include "shell.h"
 
 int main(int argc, char *argv[]){
-	init();
 	
+	init();
 	int i;
 	char name[18];
 	ls(".");
@@ -10,11 +10,21 @@ int main(int argc, char *argv[]){
 		sprintf(name, "/subdir %d", i);
 		mkdir(name);
 		ls(".");
-		//getchar();
+		getchar();
 	}
 	
-	set_entry(&clusters[0].dir[2], "file1", ATTR_FILE, fat_get_free_cluster(), 15);
-	memcpy(&clusters[fat_get_free_cluster()].data, "abcdefghijklmn", 15);
+	uint16_t cluster = fat_get_free_cluster();
+	set_entry(&clusters[0].dir[2], "file1", ATTR_FILE, cluster, 15);
+	memcpy(&clusters[cluster].data, "abcdefghijklmn", 15);
+	/* Atualizando a fat */
+	fat[cluster + FIRST_CLUSTER] = EOF;
+	
+	/* Atualizando a partição. */
+	FILE *file_ptr = fopen(fat_name, "rb+");
+	fseek(file_ptr, sizeof(boot_block) + sizeof(fat), SEEK_SET);
+	fseek(file_ptr, sizeof(root_dir) + (&clusters[fat_get_free_cluster()].dir[0] - clusters[0].dir) * sizeof(*&clusters[fat_get_free_cluster()].data), SEEK_CUR);
+	fwrite(&clusters[fat_get_free_cluster()].data, sizeof(*&clusters[fat_get_free_cluster()].data), 1, file_ptr);
+	fclose(file_ptr);
 	
 	cd("subdir 0");
 	ls(".");
@@ -25,6 +35,16 @@ int main(int argc, char *argv[]){
 	ls(".");
 	
 	stat("subdir 5");
+	
+	printf("FAt:\n");
+	for(i=0; i<NUM_CLUSTER; i++){
+		if(fat[i] != 0){
+			printf("%4d | %3x: 0x%04x\n", i, 1024 + i, fat[i]);
+		}
+	}
+	getchar();
+	
+	write_to_disk();
 
 	//init();
 	

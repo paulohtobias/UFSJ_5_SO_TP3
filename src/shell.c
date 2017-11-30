@@ -100,12 +100,15 @@ void mkdir(const char *pathname){
 		printf("%s is full.\n", path);
 		return;
 	}
+	set_entry(&get_data_cluster(dir_entry)->dir[i], dir_name, ATTR_DIR, cluster_livre + FIRST_CLUSTER, CLUSTER_SIZE);
+	
 	/* Atualizando a fat */
 	fat[cluster_livre + FIRST_CLUSTER] = EOF;
-	
-	set_entry(&get_data_cluster(dir_entry)->dir[i], dir_name, ATTR_DIR, cluster_livre + FIRST_CLUSTER, CLUSTER_SIZE);
 	
 	/* Criando os diretórios '.' e '..' */
 	set_entry(&clusters[cluster_livre].dir[0], ".", ATTR_DIR, cluster_livre + FIRST_CLUSTER, CLUSTER_SIZE);
 	set_entry(&clusters[cluster_livre].dir[1], "..", ATTR_DIR, dir_entry->first_block, CLUSTER_SIZE);
+}
+
+void shell(const char *funcao, const char *arg){
 }

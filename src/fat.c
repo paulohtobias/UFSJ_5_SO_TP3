@@ -1,9 +1,7 @@
 #include "fat.h"
 
 void init(void){
-	FILE *ptr_file;
 	int i;
-	ptr_file = fopen(fat_name, "wb");
 	
 	/* Cluster 0: boot block */
 	for(i = 0; i < CLUSTER_SIZE; ++i){
@@ -27,12 +25,39 @@ void init(void){
 	root_dir[1].first_block = 0x09;
 	root_dir[1].size = CLUSTER_SIZE;
 
+	fat[i++] = EOF;
+	
 	/* Current dir começa com '/' */
 	g_current_dir = root_dir;
 
 	while(i < NUM_CLUSTER){
 		fat[i++] = FREE_CLUSTER;
 	}
+	
+	/* Escrevendo no disco. */
+	write_to_disk();
+}
+
+void load(void){
+	FILE *ptr_file;
+	ptr_file = fopen(fat_name, "rb");
+	if(ptr_file != NULL){
+		printf("Partição inexistente.\n");
+		return;
+	}
+	
+	/* Lendo do disco. */
+	fseek(ptr_file, sizeof(boot_block), SEEK_SET);
+	fread(fat, sizeof(fat), 1, ptr_file);
+	fread(root_dir, sizeof(root_dir), 1, ptr_file);
+	fclose(ptr_file);
+	
+	/* Current dir começa com '/' */
+	g_current_dir = root_dir;
+}
+
+void write_to_disk(void){
+	FILE *ptr_file = fopen(fat_name, "wb");
 	
 	/* Escrevendo no disco. */
 	fwrite(boot_block, sizeof(boot_block), 1, ptr_file);
@@ -43,20 +68,9 @@ void init(void){
 	fclose(ptr_file);
 }
 
-void load(void){
-	FILE *ptr_file;
-	ptr_file = fopen(fat_name, "rb");
-	
-	/* Lendo do disco. */
-	fseek(ptr_file, sizeof(boot_block), SEEK_SET);
-	fread(fat, sizeof(fat), 1, ptr_file);
-	fread(root_dir, sizeof(root_dir), 1, ptr_file);
-	fclose(ptr_file);
-}
-
 uint16_t fat_get_free_cluster(void){
 	uint16_t i;
-	for(i = FIRST_CLUSTER; i < sizeof(fat) && fat[i] != FREE_CLUSTER; i++);
+	for(i = FIRST_CLUSTER; i < NUM_CLUSTER && fat[i] != FREE_CLUSTER; i++);
 	if(i == sizeof(fat)){
 		return -1;
 	}
