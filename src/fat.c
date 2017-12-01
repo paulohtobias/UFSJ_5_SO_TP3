@@ -1,6 +1,7 @@
 #include "fat.h"
 
 void init(void){
+	printf("INIT\n");
 	int i;
 	
 	/* Cluster 0: boot block */
@@ -15,6 +16,7 @@ void init(void){
 	}
 	
 	/* Cluster 9: root dir */
+	memset(root_dir, 0, sizeof(root_dir));
 	memcpy(root_dir[0].filename, ".", 2);
 	root_dir[0].attributes = ATTR_DIR;
 	root_dir[0].first_block = 0x09;
@@ -34,6 +36,8 @@ void init(void){
 		fat[i++] = FREE_CLUSTER;
 	}
 	
+	memset(clusters, 0, sizeof(clusters));
+	
 	/* Escrevendo no disco. */
 	write_to_disk();
 }
@@ -41,7 +45,7 @@ void init(void){
 void load(void){
 	FILE *ptr_file;
 	ptr_file = fopen(fat_name, "rb");
-	if(ptr_file != NULL){
+	if(ptr_file == NULL){
 		printf("Partição inexistente.\n");
 		return;
 	}
@@ -72,6 +76,7 @@ uint16_t fat_get_free_cluster(void){
 	uint16_t i;
 	for(i = FIRST_CLUSTER; i < NUM_CLUSTER && fat[i] != FREE_CLUSTER; i++);
 	if(i == sizeof(fat)){
+		errno = ENOSPC;
 		return -1;
 	}
 	return i - FIRST_CLUSTER;
@@ -117,7 +122,12 @@ void set_entry(dir_entry_t *entry, const char *filename, uint8_t attributes, uin
 	fclose(file_ptr);
 }
 
-dir_entry_t *search_file(const char *pathname){
+dir_entry_t *search_file(const char *pathname, uint8_t attributes){
+	if(pathname == NULL){
+		errno = EINVAL;
+		return NULL;
+	}
+	
 	/* Se paathname for '/', então não precisa ser procurado. */
 	if(strcmp(pathname, "/") == 0){
 		return &root_dir[0];
@@ -135,6 +145,10 @@ dir_entry_t *search_file(const char *pathname){
 
 	int i;
 	dir_entry_t *current_dir = g_current_dir;
+	/* Se o caminho começa com /, então comece a pesquisar a partir da raiz. */
+	if(pathname[0] == '/'){
+		current_dir = root_dir;
+	}
 
 	char *search_name = token;
 	while(token != NULL){
@@ -146,22 +160,41 @@ dir_entry_t *search_file(const char *pathname){
 			if(strcmp(current_dir[i].filename, search_name) == 0){
 				found = 1;
 				if(token == NULL){
-					return &current_dir[i];
+					/* Verificando se o arquivo tem o atributo desejado. */
+					if(attributes == ATTR_ANY || attributes == current_dir[i].attributes){
+						return &current_dir[i];
+					}else{
+						/* Verificando qual o atributo desejado para informar o erro corretamente. */
+						if(attributes == ATTR_DIR){
+							errno = ENOTDIR;
+						}else{
+							errno = EISDIR;
+						}
+						return NULL;
+					}
 				}
 				/* Se token != NULL, então a árvore de caminhos ainda não foi totalmente percorrida. */
 				else{
+					/* Checando se é diretório para continuar a descer na árvore. */
+					if(current_dir[i].attributes != ATTR_DIR){
+						errno = ENOTDIR;
+						return NULL;
+					}
 					current_dir = get_data_cluster(&current_dir[i])->dir;
 					break;
 				}
 			}
 		}
 
+		/* Arquivo não foi encontrado. */
 		if(!found){
+			errno = ENOENT;
 			return NULL;
 		}
 
 		search_name = token;
 	}
-
+	
+	//TO-DO: talvez inútil.
 	return NULL;
 }

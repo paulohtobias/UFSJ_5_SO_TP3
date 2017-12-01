@@ -1,4 +1,8 @@
- * manter lista de blocos livres (usar lista encadeada).
- * incluir . e .. na lista de diretórios.
- ? resolver caminhos relativos.
+ * (FEITO) manter lista de blocos livres (usar lista encadeada).
+ * (FEITO) incluir . e .. na lista de diretórios.
+ ? (FEITO) resolver caminhos relativos.
 	. variável global current_dir;
+ * verificar se uma barra no final de um argumento fode com a função search.
+
+=======================================
+pensar melhor em como ler e escrever os clusters.

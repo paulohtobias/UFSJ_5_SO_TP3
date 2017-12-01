@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
+#include <errno.h>
 
 /* DEFINE */
 #define SECTOR_SIZE 512
@@ -21,6 +22,7 @@
 
 #define ATTR_FILE 0
 #define ATTR_DIR 1
+#define ATTR_ANY 2
 
 struct _dir_entry_t{
 	char filename[18];
@@ -58,6 +60,6 @@ data_cluster *get_data_cluster(dir_entry_t *entry);
 
 void set_entry(dir_entry_t *entry, const char *filename, uint8_t attributes, uint16_t first_block, uint32_t size);
 
-dir_entry_t *search_file(const char *pathname);
+dir_entry_t *search_file(const char *pathname, uint8_t attributes);
 
 #endif /* FAT_H */
