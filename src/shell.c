@@ -10,7 +10,7 @@ void cd(const char *pathname){
 	}
 	
 	/* Atualizando o diretório corrente. */
-	g_current_dir = get_data_cluster(dir_entry)->dir;
+	g_current_dir = get_data_cluster(dir_entry->first_block)->dir;
 	
 	/* Atualizando o caminho. */
 	const char *tmp = strrchr(pathname, '/');
@@ -51,7 +51,7 @@ void ls(const char *pathname){
 		return;
 	}
 
-	dir_entry_t *dir = get_data_cluster(dir_entry)->dir;
+	dir_entry_t *dir = get_data_cluster(dir_entry->first_block)->dir;
 
 	int i;
 	for(i = 0; i < ENTRY_BY_CLUSTER; i++){
@@ -68,7 +68,6 @@ void ls(const char *pathname){
 void mkdir(const char *pathname){
 	/* Se a pasta já existe, então não é preciso fazer nada. */
 	dir_entry_t *dir_entry = search_file(pathname, ATTR_DIR);
-	int ee = errno;
 	if(dir_entry != NULL){
 		printf("'%s' already exists.\n", pathname);
 		return;
@@ -110,12 +109,13 @@ void mkdir(const char *pathname){
 	
 	/* Encontrando uma posição vazia para a nova pasta. */
 	int i;
-	for(i = 0; i < ENTRY_BY_CLUSTER && get_data_cluster(dir_entry)->dir[i].filename[0] != '\0'; i++);
+	dir_entry_t *dir = get_data_cluster(dir_entry->first_block)->dir;
+	for(i = 0; i < ENTRY_BY_CLUSTER && dir[i].filename[0] != '\0'; i++);
 	if(i == ENTRY_BY_CLUSTER){
 		printf("'%s' is full.\n", path);
 		return;
 	}
-	set_entry(&get_data_cluster(dir_entry)->dir[i], dir_name, ATTR_DIR, cluster_livre + FIRST_CLUSTER, CLUSTER_SIZE);
+	set_entry(&dir[i], dir_name, ATTR_DIR, cluster_livre + FIRST_CLUSTER, CLUSTER_SIZE);
 	
 	/* Atualizando a fat */
 	fat[cluster_livre + FIRST_CLUSTER] = EOF;

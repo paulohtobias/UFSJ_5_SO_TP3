@@ -77,6 +77,7 @@ void write_to_disk(void){
 uint16_t fat_get_free_cluster(void){
 	uint16_t i;
 	for(i = FIRST_CLUSTER; i < NUM_CLUSTER && fat[i] != FREE_CLUSTER; i++);
+	
 	if(i == sizeof(fat)){
 		errno = ENOSPC;
 		return -1;
@@ -84,19 +85,19 @@ uint16_t fat_get_free_cluster(void){
 	return i - FIRST_CLUSTER;
 }
 
-data_cluster *get_data_cluster(dir_entry_t *entry){
+data_cluster *get_data_cluster(uint16_t first_block){
 	/* Lendo os dados no disco. */
 	FILE *file_ptr = fopen(fat_name, "rb");
 	
-	fseek(file_ptr, entry->first_block * sizeof(data_cluster), SEEK_SET);
+	fseek(file_ptr, first_block * sizeof(data_cluster), SEEK_SET);
 	
 	data_cluster *cluster;
 	
-	if(entry->first_block == 0x09){
+	if(first_block == 0x09){
 		cluster = (data_cluster *)root_dir;
 	}else{
 		//TO-DO: usar a FAT pra ler mais clusters caso o arquivo seja grande.
-		cluster = &clusters[entry->first_block - FIRST_CLUSTER];
+		cluster = &clusters[first_block - FIRST_CLUSTER];
 	}
 	
 	fread(cluster, sizeof(data_cluster), 1, file_ptr);
@@ -182,7 +183,7 @@ dir_entry_t *search_file(const char *pathname, uint8_t attributes){
 						errno = ENOTDIR;
 						return NULL;
 					}
-					current_dir = get_data_cluster(&current_dir[i])->dir;
+					current_dir = get_data_cluster(current_dir[i].first_block)->dir;
 					break;
 				}
 			}

@@ -57,7 +57,7 @@ void write_to_disk(void);
 
 uint16_t fat_get_free_cluster(void);
 
-data_cluster *get_data_cluster(dir_entry_t *entry);
+data_cluster *get_data_cluster(uint16_t fist_block);
 
 void set_entry(dir_entry_t *entry, const char *filename, uint8_t attributes, uint16_t first_block, uint32_t size);
 
