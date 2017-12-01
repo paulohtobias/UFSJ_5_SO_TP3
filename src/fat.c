@@ -37,10 +37,19 @@ void init(void){
 	strcpy(g_current_dir_name, "/");
 	g_current_dir = root_dir;
 	
+	/* Clusters 10-4095: data clusters */
 	memset(clusters, 0, sizeof(clusters));
 	
 	/* Escrevendo no disco. */
-	write_to_disk();
+	FILE *ptr_file = fopen(fat_name, "wb");
+	fwrite(boot_block, sizeof(boot_block), 1, ptr_file);
+	fwrite(fat, sizeof(fat), 1, ptr_file);
+	fwrite(root_dir, sizeof(root_dir), 1, ptr_file);
+	fwrite(clusters, sizeof(data_cluster), 1, ptr_file);
+	fclose(ptr_file);
+	
+	/* Escrevendo no disco. */
+	exit_and_save();
 }
 
 void load(void){
@@ -57,19 +66,20 @@ void load(void){
 	fread(root_dir, sizeof(root_dir), 1, ptr_file);
 	fclose(ptr_file);
 	
+	memset(clusters, 0, sizeof(clusters));
+	
 	/* Current dir começa com '/' */
 	strcpy(g_current_dir_name, "/");
 	g_current_dir = root_dir;
 }
 
-void write_to_disk(void){
-	FILE *ptr_file = fopen(fat_name, "wb");
+void exit_and_save(void){
+	FILE *ptr_file = fopen(fat_name, "rb+");
 	
 	/* Escrevendo no disco. */
 	fwrite(boot_block, sizeof(boot_block), 1, ptr_file);
 	fwrite(fat, sizeof(fat), 1, ptr_file);
 	fwrite(root_dir, sizeof(root_dir), 1, ptr_file);
-	fwrite(clusters, sizeof(clusters), 1, ptr_file);
 
 	fclose(ptr_file);
 }

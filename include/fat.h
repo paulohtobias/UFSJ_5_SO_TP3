@@ -53,7 +53,7 @@ void init(void);
 
 void load(void);
 
-void write_to_disk(void);
+void exit_and_save(void);
 
 uint16_t fat_get_free_cluster(void);
 

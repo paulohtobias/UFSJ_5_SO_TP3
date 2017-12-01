@@ -230,7 +230,7 @@ void shell_call_function(char *command){
 		return;
 	}
 	if(strcmp("exit", argv[0]) == 0){
-		write_to_disk();
+		exit_and_save();
 		exit(0);
 		return;
 	}

@@ -66,7 +66,7 @@ int maint(int argc, char *argv[]){
 	}
 	getchar();
 	
-	write_to_disk();
+	exit_and_save();
 
 	//init();
 	
