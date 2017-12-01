@@ -9,7 +9,15 @@ void cd(const char *pathname){
 		return;
 	}
 	
+	/* Atualizando o diretório corrente. */
 	g_current_dir = get_data_cluster(dir_entry)->dir;
+	
+	/* Atualizando o caminho. */
+	const char *tmp = strrchr(pathname, '/');
+	if(tmp == NULL){
+		tmp = pathname;
+	}
+	strcpy(g_current_dir_name, tmp + (tmp[0] == '/'));
 }
 
 void stat(const char *pathname){
@@ -30,7 +38,12 @@ void stat(const char *pathname){
 }
 
 void ls(const char *pathname){
-	dir_entry_t *dir_entry = search_file(pathname, ATTR_DIR);
+	dir_entry_t *dir_entry;
+	if(pathname == NULL){
+		dir_entry = search_file(".", ATTR_DIR);
+	}else{
+		dir_entry = search_file(pathname, ATTR_DIR);
+	}
 
 	/* Error checking. */
 	if(dir_entry == NULL){

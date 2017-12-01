@@ -28,13 +28,14 @@ void init(void){
 	root_dir[1].size = CLUSTER_SIZE;
 
 	fat[i++] = EOF;
-	
-	/* Current dir começa com '/' */
-	g_current_dir = root_dir;
 
 	while(i < NUM_CLUSTER){
 		fat[i++] = FREE_CLUSTER;
 	}
+	
+	/* Current dir começa com '/' */
+	strcpy(g_current_dir_name, "/");
+	g_current_dir = root_dir;
 	
 	memset(clusters, 0, sizeof(clusters));
 	
@@ -57,6 +58,7 @@ void load(void){
 	fclose(ptr_file);
 	
 	/* Current dir começa com '/' */
+	strcpy(g_current_dir_name, "/");
 	g_current_dir = root_dir;
 }
 

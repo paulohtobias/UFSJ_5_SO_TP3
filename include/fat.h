@@ -45,8 +45,9 @@ typedef union _data_cluster data_cluster;
 uint8_t boot_block[CLUSTER_SIZE];
 uint16_t fat[NUM_CLUSTER];
 dir_entry_t root_dir[ENTRY_BY_CLUSTER];
-dir_entry_t *g_current_dir;
 data_cluster clusters[4086];
+dir_entry_t *g_current_dir;
+char g_current_dir_name[1024];
 
 void init(void);
 
