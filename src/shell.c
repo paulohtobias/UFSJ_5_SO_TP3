@@ -167,15 +167,17 @@ char **shell_parse_command(char *command, int *argc){
 		argv[0] = temp;
 		return argv;
 	}
-	*command++ = '\0';
+	*command = '\0';
 	argv[0] = malloc(command - temp);
 	strcpy(argv[0], temp);
+	*command = ' ';
 
 	/* Autômato para processar os argumentos. */
-	int DFA[3][3] = {
-		{-1, 2, 1},
-		{0, 2, 1},
-		{2, 1, 2}
+	int DFA[4][4] = {
+		{1, 2, 3, -1},
+		{0, 2, 3, 1},
+		{2, 1, 2, 2},
+		{3, 3, 1, 3}
 	};
 	int state = 0;
 
@@ -197,12 +199,14 @@ char **shell_parse_command(char *command, int *argc){
 			s = 0;
 		}else if(command[i] == '\''){
 			s = 1;
-		}else{
+		}else if(command[i] == '\"'){
 			s = 2;
+		}else{
+			s = 3;
 		}
 
-		/* Copia o caractere para o argv. */
-		if(s == 2 || (state == 2 && s == 0)){
+		/* Copia o caractere para o argv somente se for um self-loop. */
+		if(state == DFA[state][s]){
 			argv[(*argc)][j++] = command[i];
 			argv[(*argc)][j] = '\0'; /* Garantindo que terá um \0 no final da string. */
 		}
@@ -222,12 +226,17 @@ char **shell_parse_command(char *command, int *argc){
 				return NULL;
 			}
 			j = 0;
-			if(s == 1){
-				i++;
-			}
 		}
 	}
 	(*argc)++;
+	
+	/* Ignorando uma possível / ao final do caminho. */
+	if(*argc > 1){
+		size_t len = strlen(argv[1]);
+		if(len > 1 && argv[1][len - 1] == '/'){
+			argv[1][len - 1] = '\0';
+		}
+	}
 
 	return argv;
 }
@@ -240,14 +249,6 @@ void shell_process_command(char* command){
 	if(argv == NULL){
 		perror("shell_process_command");
 		return;
-	}
-
-	/* Ignorando uma possível / ao final do caminho. */
-	if(argc > 1){
-		size_t len = strlen(argv[1]);
-		if(len > 1 && argv[1][len - 1] == '/'){
-			argv[1][len - 1] = '\0';
-		}
 	}
 
 	if(strcmp("init", argv[0]) == 0){
