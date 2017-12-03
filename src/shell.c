@@ -10,7 +10,7 @@ void cd(const char *pathname){
 	}
 	
 	/* Atualizando o diretório corrente. */
-	g_current_dir = get_data_cluster(dir_entry->first_block)->dir;
+	g_current_dir = read_data_cluster(dir_entry->first_block)->dir;
 	
 	/* Atualizando o caminho. */
 	const char *tmp = strrchr(pathname, '/');
@@ -51,7 +51,7 @@ void ls(const char *pathname){
 		return;
 	}
 
-	dir_entry_t *dir = get_data_cluster(dir_entry->first_block)->dir;
+	dir_entry_t *dir = read_data_cluster(dir_entry->first_block)->dir;
 
 	int i;
 	for(i = 0; i < ENTRY_BY_CLUSTER; i++){
@@ -109,33 +109,37 @@ void mkdir(const char *pathname){
 	
 	/* Encontrando uma posição vazia para a nova pasta. */
 	int i;
-	dir_entry_t *dir = get_data_cluster(dir_entry->first_block)->dir;
+	dir_entry_t *dir = read_data_cluster(dir_entry->first_block)->dir;
 	for(i = 0; i < ENTRY_BY_CLUSTER && dir[i].filename[0] != '\0'; i++);
 	if(i == ENTRY_BY_CLUSTER){
 		printf("'%s' is full.\n", path);
 		return;
 	}
-	set_entry(&dir[i], dir_name, ATTR_DIR, cluster_livre + FIRST_CLUSTER, CLUSTER_SIZE);
+	
+	/* Inserindo o novo diretório dentro do diretório pai. */
+	set_entry(&dir[i], dir_name, ATTR_DIR, cluster_livre, CLUSTER_SIZE);
+	write_data_cluster(dir_entry->first_block);
 	
 	/* Atualizando a fat */
-	fat[cluster_livre + FIRST_CLUSTER] = EOF;
+	fat[cluster_livre] = EOF;
 	
 	/* Criando os diretórios '.' e '..' */
-	set_entry(&clusters[cluster_livre].dir[0], ".", ATTR_DIR, cluster_livre + FIRST_CLUSTER, CLUSTER_SIZE);
-	set_entry(&clusters[cluster_livre].dir[1], "..", ATTR_DIR, dir_entry->first_block, CLUSTER_SIZE);
+	dir = read_data_cluster(cluster_livre)->dir;
+	set_entry(&dir[0], ".", ATTR_DIR, cluster_livre, CLUSTER_SIZE);
+	set_entry(&dir[1], "..", ATTR_DIR, dir_entry->first_block, CLUSTER_SIZE);
+	write_data_cluster(cluster_livre);
 	
 	free(path);
 }
 
 char **shell_parse_command(char *command, int *argc){
-	char **argv = malloc(4 * sizeof(char *));
+	char **argv = malloc(3 * sizeof(char *));
 	
 	*argc = 0;
 	
 	argv[0] = NULL;
 	argv[1] = NULL;
 	argv[2] = NULL;
-	argv[3] = NULL; /* Sempre será NULL */
 	
 	/* Obtendo o primeiro parâmetro: o nome da função. */
 	char *temp = command;
@@ -164,8 +168,10 @@ char **shell_parse_command(char *command, int *argc){
 			argv[(*argc)] = malloc(1024); /* Tamanho escolhido abitrariamente. */
 		}
 		
-		argv[(*argc)][j++] = command[i];
-		argv[(*argc)][j] = '\0'; /* Garantindo que terá um \0 no final da string. */
+		if(!((state == 0 || state == 2) && command[i] == '\'')){
+			argv[(*argc)][j++] = command[i];
+			argv[(*argc)][j] = '\0'; /* Garantindo que terá um \0 no final da string. */
+		}
 		
 		/*
 		 * Conversão do caractere para um símbolo válido no autômato.
@@ -201,7 +207,7 @@ char **shell_parse_command(char *command, int *argc){
 	return argv;
 }
 
-void shell_call_function(char *command){
+void shell_process_command(char* command){
 	int argc;
 	char **argv = shell_parse_command(command, &argc);
 	
@@ -232,6 +238,15 @@ void shell_call_function(char *command){
 	if(strcmp("exit", argv[0]) == 0){
 		exit_and_save();
 		exit(0);
+		return;
+	}
+	if(strcmp("fat", argv[0]) == 0){
+		int i;
+		for(i=0; i<4096; i++){
+			if(fat[i] != 0){
+				printf("%4d: 0x%04x\n", i, fat[i]);
+			}
+		}
 		return;
 	}
 	printf("%s: command not found\n", argv[0]);

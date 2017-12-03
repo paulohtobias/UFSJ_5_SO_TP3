@@ -15,18 +15,9 @@ void init(void){
 	}
 	
 	/* Cluster 9: root dir */
-	//set_entry(&root_dir[0], ".", ATTR_DIR, 0x0009, CLUSTER_SIZE);
 	memset(root_dir, 0, sizeof(root_dir));
-	memcpy(root_dir[0].filename, ".", 2);
-	root_dir[0].attributes = ATTR_DIR;
-	root_dir[0].first_block = 0x09;
-	root_dir[0].size = CLUSTER_SIZE;
-
-	//set_entry(&root_dir[1], "..", ATTR_DIR, 0x0009, CLUSTER_SIZE);
-	memcpy(root_dir[1].filename, "..", 3);
-	root_dir[1].attributes = ATTR_DIR;
-	root_dir[1].first_block = 0x09;
-	root_dir[1].size = CLUSTER_SIZE;
+	set_entry(&root_dir[0], ".", ATTR_DIR, 0x0009, CLUSTER_SIZE);
+	set_entry(&root_dir[1], "..", ATTR_DIR, 0x0009, CLUSTER_SIZE);
 
 	fat[i++] = EOF;
 
@@ -89,14 +80,14 @@ uint16_t fat_get_free_cluster(void){
 	uint16_t i;
 	for(i = FIRST_CLUSTER; i < NUM_CLUSTER && fat[i] != FREE_CLUSTER; i++);
 	
-	if(i == sizeof(fat)){
+	if(i == NUM_CLUSTER){
 		errno = ENOSPC;
 		return -1;
 	}
 	return i;
 }
 
-data_cluster *get_data_cluster(uint16_t first_block){
+data_cluster *read_data_cluster(uint16_t first_block){
 	/* Lendo os dados no disco. */
 	FILE *file_ptr = fopen(fat_name, "rb");
 	
@@ -116,13 +107,21 @@ data_cluster *get_data_cluster(uint16_t first_block){
 	fclose(file_ptr);
 	
 	return cluster;
-void write_data_cluster(data_cluster *cluster, uint16_t first_block){
+}
+
+void write_data_cluster(uint16_t first_block){
 	/* Atualizando a partição. */
 	FILE *file_ptr = fopen(fat_name, "rb+");
-
-	if(first_block == 0x0009){
-		memcpy(root_dir, cluster->dir, sizeof(root_dir));
+	
+	data_cluster *cluster;
+	
+	if(first_block == 0x09){
+		cluster = (data_cluster *)root_dir;
+	}else{
+		//TO-DO: usar a FAT pra ler mais clusters caso o arquivo seja grande.
+		cluster = &clusters[first_block - FIRST_CLUSTER];
 	}
+	
 	fseek(file_ptr, first_block * sizeof(data_cluster), SEEK_SET);
 	fwrite(cluster, sizeof(data_cluster), 1, file_ptr);
 
@@ -195,7 +194,7 @@ dir_entry_t *search_file(const char *pathname, uint8_t attributes){
 						errno = ENOTDIR;
 						return NULL;
 					}
-					current_dir = get_data_cluster(current_dir[i].first_block)->dir;
+					current_dir = read_data_cluster(current_dir[i].first_block)->dir;
 					break;
 				}
 			}
