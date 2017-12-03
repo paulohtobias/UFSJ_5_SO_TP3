@@ -6,3 +6,6 @@
 
 =======================================
 pensar melhor em como ler e escrever os clusters.
+
+ * a função set_entry não vai mais escrever no disco.
+ * criar uma função nova para atualizar um cluster específico.

@@ -13,6 +13,6 @@ void mkdir(const char *pathname);
 
 char **shell_parse_command(char *command, int *argc);
 
-void shell_call_function(char *command);
+void shell_process_command(char *command);
 
 #endif /* SHELL_H */

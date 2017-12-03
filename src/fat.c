@@ -1,7 +1,6 @@
 #include "fat.h"
 
 void init(void){
-	printf("INIT\n");
 	int i;
 	
 	/* Cluster 0: boot block */
@@ -16,12 +15,14 @@ void init(void){
 	}
 	
 	/* Cluster 9: root dir */
+	//set_entry(&root_dir[0], ".", ATTR_DIR, 0x0009, CLUSTER_SIZE);
 	memset(root_dir, 0, sizeof(root_dir));
 	memcpy(root_dir[0].filename, ".", 2);
 	root_dir[0].attributes = ATTR_DIR;
 	root_dir[0].first_block = 0x09;
 	root_dir[0].size = CLUSTER_SIZE;
 
+	//set_entry(&root_dir[1], "..", ATTR_DIR, 0x0009, CLUSTER_SIZE);
 	memcpy(root_dir[1].filename, "..", 3);
 	root_dir[1].attributes = ATTR_DIR;
 	root_dir[1].first_block = 0x09;
@@ -92,7 +93,7 @@ uint16_t fat_get_free_cluster(void){
 		errno = ENOSPC;
 		return -1;
 	}
-	return i - FIRST_CLUSTER;
+	return i;
 }
 
 data_cluster *get_data_cluster(uint16_t first_block){
@@ -111,9 +112,21 @@ data_cluster *get_data_cluster(uint16_t first_block){
 	}
 	
 	fread(cluster, sizeof(data_cluster), 1, file_ptr);
+
 	fclose(file_ptr);
 	
 	return cluster;
+void write_data_cluster(data_cluster *cluster, uint16_t first_block){
+	/* Atualizando a partição. */
+	FILE *file_ptr = fopen(fat_name, "rb+");
+
+	if(first_block == 0x0009){
+		memcpy(root_dir, cluster->dir, sizeof(root_dir));
+	}
+	fseek(file_ptr, first_block * sizeof(data_cluster), SEEK_SET);
+	fwrite(cluster, sizeof(data_cluster), 1, file_ptr);
+
+	fclose(file_ptr);
 }
 
 void set_entry(dir_entry_t *entry, const char *filename, uint8_t attributes, uint16_t first_block, uint32_t size){
@@ -122,17 +135,6 @@ void set_entry(dir_entry_t *entry, const char *filename, uint8_t attributes, uin
 	memset(entry->reserved, 0, 7);
 	entry->first_block = first_block;
 	entry->size = size;
-	
-	/* Atualizando a partição. */
-	FILE *file_ptr = fopen(fat_name, "rb+");
-	fseek(file_ptr, sizeof(boot_block) + sizeof(fat), SEEK_SET);
-	if(entry < clusters[0].dir){
-		fseek(file_ptr, (entry - root_dir) * sizeof(*entry), SEEK_CUR);
-	}else{
-		fseek(file_ptr, sizeof(root_dir) + (entry - clusters[0].dir) * sizeof(*entry), SEEK_CUR);
-	}
-	fwrite(entry, sizeof(*entry), 1, file_ptr);
-	fclose(file_ptr);
 }
 
 dir_entry_t *search_file(const char *pathname, uint8_t attributes){
