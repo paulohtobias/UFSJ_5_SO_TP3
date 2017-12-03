@@ -65,6 +65,59 @@ void ls(const char *pathname){
 	printf("\n");
 }
 
+dir_entry_t *create_entry(const char *pathname, uint16_t *cluster_livre, uint8_t attribute, int recursive){
+	/* Separando o caminho do nome do arquivo */
+	char *path;
+	const char *entry_name = strrchr(pathname, '/');
+	if(entry_name == NULL){
+		path = malloc(2);
+		strcpy(path, ".");
+		entry_name = pathname;
+	}else{
+		size_t path_len = entry_name - pathname + 2;
+		path = malloc(path_len);
+		strncpy(path, pathname, path_len - 1);
+		path[path_len - 1] = '\0';
+		entry_name++;
+	}
+
+	/* Verificando se o caminho existe */
+	dir_entry_t *dir_entry = search_file(path, ATTR_DIR);
+
+	/* Error checking. */
+	if(dir_entry == NULL){
+		perror(path);
+		return 0;
+	}
+	
+	/* Encontrando um bloco livre pra adicionar o arquivo. */
+	if((*cluster_livre = fat_get_free_cluster()) == -1){
+		perror("create_entry");
+		return 0;
+	}
+
+	/* Encontrando uma posição vazia no diretório pai para o arquivo. */
+	int i;
+	dir_entry_t *dir = read_data_cluster(dir_entry->first_block)->dir;
+	for(i = 0; i < ENTRY_BY_CLUSTER && dir[i].filename[0] != '\0'; i++);
+	if(i == ENTRY_BY_CLUSTER){
+		printf("'%s' is full.\n", path);
+		free(path);
+		return 0;
+	}
+
+	/* Inserindo o novo diretório dentro do diretório pai. */
+	set_entry(&dir[i], entry_name, attribute, *cluster_livre, CLUSTER_SIZE);
+	write_data_cluster(dir_entry->first_block);
+
+	/* Atualizando a fat */
+	fat[*cluster_livre] = EOF;
+	
+	free(path);
+	
+	return dir_entry;
+}
+
 void mkdir(const char *pathname){
 	/* Se a pasta já existe, então não é preciso fazer nada. */
 	dir_entry_t *dir_entry = search_file(pathname, ATTR_DIR);
@@ -76,63 +129,29 @@ void mkdir(const char *pathname){
 		return;
 	}
 
-	/* Separando o caminho do nome da pasta */
-	char *path;
-	const char *dir_name = strrchr(pathname, '/');
-	if(dir_name == NULL){
-		path = malloc(2);
-		strcpy(path, ".");
-		dir_name = pathname;
-	}else{
-		size_t path_len = dir_name - pathname + 2;
-		path = malloc(path_len);
-		strncpy(path, pathname, path_len - 1);
-		path[path_len - 1] = '\0';
-		dir_name++;
-	}
-
-	/* Verificando se o caminho existe */
-	dir_entry = search_file(path, ATTR_DIR);
-
-	/* Error checking. */
-	if(dir_entry == NULL){
-		perror(path);
-		return;
-	}
-
-	/* Encontrando um bloco livre pra adicionar a pasta. */
+	/* Cria uma entrada diretório no diretório pai. */
 	uint16_t cluster_livre;
-	if((cluster_livre = fat_get_free_cluster()) == -1){
-		perror("mkdir");
+	dir_entry = create_entry(pathname, &cluster_livre, ATTR_DIR, 0);
+	if(cluster_livre == 0){
+		fprintf(stderr, "mkdir: couldn't create '%s'.\n", pathname);
 		return;
 	}
-
-	/* Encontrando uma posição vazia para a nova pasta. */
-	int i;
-	dir_entry_t *dir = read_data_cluster(dir_entry->first_block)->dir;
-	for(i = 0; i < ENTRY_BY_CLUSTER && dir[i].filename[0] != '\0'; i++);
-	if(i == ENTRY_BY_CLUSTER){
-		printf("'%s' is full.\n", path);
-		return;
-	}
-
-	/* Inserindo o novo diretório dentro do diretório pai. */
-	set_entry(&dir[i], dir_name, ATTR_DIR, cluster_livre, CLUSTER_SIZE);
-	write_data_cluster(dir_entry->first_block);
-
-	/* Atualizando a fat */
-	fat[cluster_livre] = EOF;
 
 	/* Criando os diretórios '.' e '..' */
-	dir = read_data_cluster(cluster_livre)->dir;
+	dir_entry_t *dir = read_data_cluster(cluster_livre)->dir;
 	set_entry(&dir[0], ".", ATTR_DIR, cluster_livre, CLUSTER_SIZE);
 	set_entry(&dir[1], "..", ATTR_DIR, dir_entry->first_block, CLUSTER_SIZE);
 	write_data_cluster(cluster_livre);
-
-	free(path);
 }
 
 char **shell_parse_command(char *command, int *argc){
+	/* Removendo os espaços à esquerda. */
+	for(; *command == ' '; command++);
+	
+	/* Removendo os espaços à esquerda. */
+	size_t len;
+	for(len = strlen(command) - 1; len >= 0 && command[len] == ' '; command[len--] = '\0');
+	
 	char **argv = malloc(3 * sizeof(char *));
 
 	*argc = 1;
@@ -161,7 +180,7 @@ char **shell_parse_command(char *command, int *argc){
 	int state = 0;
 
 	int i, j = 0;
-	for(i = 0; command[i] != '\0' && (*argc) < 4; i++){
+	for(i = 0; command[i] != '\0'; i++){
 		/* Copia o argumento para a argv. */
 		if(argv[(*argc)] == NULL){
 			argv[(*argc)] = malloc(1024); /* Tamanho escolhido abitrariamente. */
@@ -198,6 +217,10 @@ char **shell_parse_command(char *command, int *argc){
 		}
 		if(state == 0){
 			(*argc)++;
+			if((*argc) == 3){
+				errno = E2BIG;
+				return NULL;
+			}
 			j = 0;
 			if(s == 1){
 				i++;
@@ -212,6 +235,12 @@ char **shell_parse_command(char *command, int *argc){
 void shell_process_command(char* command){
 	int argc;
 	char **argv = shell_parse_command(command, &argc);
+	
+	/* Error checking. */
+	if(argv == NULL){
+		perror("shell_process_command");
+		return;
+	}
 
 	/* Ignorando uma possível / ao final do caminho. */
 	if(argc > 1){

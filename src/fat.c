@@ -98,7 +98,6 @@ data_cluster *read_data_cluster(uint16_t first_block){
 	if(first_block == 0x09){
 		cluster = (data_cluster *) root_dir;
 	}else{
-		//TO-DO: usar a FAT pra ler mais clusters caso o arquivo seja grande.
 		cluster = &clusters[first_block - FIRST_CLUSTER];
 	}
 
@@ -118,7 +117,6 @@ void write_data_cluster(uint16_t first_block){
 	if(first_block == 0x09){
 		cluster = (data_cluster *) root_dir;
 	}else{
-		//TO-DO: usar a FAT pra ler mais clusters caso o arquivo seja grande.
 		cluster = &clusters[first_block - FIRST_CLUSTER];
 	}
 
@@ -208,4 +206,7 @@ dir_entry_t *search_file(const char *pathname, uint8_t attributes){
 
 		search_name = token;
 	}
+	
+	errno = ENOENT;
+	return NULL;
 }
