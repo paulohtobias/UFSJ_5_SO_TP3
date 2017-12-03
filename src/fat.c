@@ -2,7 +2,7 @@
 
 void init(void){
 	int i;
-	
+
 	/* Cluster 0: boot block */
 	for(i = 0; i < CLUSTER_SIZE; ++i){
 		boot_block[i] = 0xbb;
@@ -13,7 +13,7 @@ void init(void){
 	for(i = 1; i <= 8; ++i){
 		fat[i] = FAT_CLUSTER;
 	}
-	
+
 	/* Cluster 9: root dir */
 	memset(root_dir, 0, sizeof(root_dir));
 	set_entry(&root_dir[0], ".", ATTR_DIR, 0x0009, CLUSTER_SIZE);
@@ -24,22 +24,22 @@ void init(void){
 	while(i < NUM_CLUSTER){
 		fat[i++] = FREE_CLUSTER;
 	}
-	
+
 	/* Current dir começa com '/' */
 	strcpy(g_current_dir_name, "/");
 	g_current_dir = root_dir;
-	
+
 	/* Clusters 10-4095: data clusters */
 	memset(clusters, 0, sizeof(clusters));
-	
+
 	/* Escrevendo no disco. */
 	FILE *ptr_file = fopen(fat_name, "wb");
 	fwrite(boot_block, sizeof(boot_block), 1, ptr_file);
 	fwrite(fat, sizeof(fat), 1, ptr_file);
 	fwrite(root_dir, sizeof(root_dir), 1, ptr_file);
-	fwrite(clusters, sizeof(data_cluster), 1, ptr_file);
+	fwrite(clusters, sizeof(clusters), 1, ptr_file);
 	fclose(ptr_file);
-	
+
 	/* Escrevendo no disco. */
 	exit_and_save();
 }
@@ -51,15 +51,15 @@ void load(void){
 		printf("Partição inexistente.\n");
 		return;
 	}
-	
+
 	/* Lendo do disco. */
 	fseek(ptr_file, sizeof(boot_block), SEEK_SET);
 	fread(fat, sizeof(fat), 1, ptr_file);
 	fread(root_dir, sizeof(root_dir), 1, ptr_file);
 	fclose(ptr_file);
-	
+
 	memset(clusters, 0, sizeof(clusters));
-	
+
 	/* Current dir começa com '/' */
 	strcpy(g_current_dir_name, "/");
 	g_current_dir = root_dir;
@@ -67,9 +67,9 @@ void load(void){
 
 void exit_and_save(void){
 	FILE *ptr_file = fopen(fat_name, "rb+");
-	
+
 	/* Escrevendo no disco. */
-	fwrite(boot_block, sizeof(boot_block), 1, ptr_file);
+	fseek(ptr_file, sizeof(boot_block), SEEK_SET);
 	fwrite(fat, sizeof(fat), 1, ptr_file);
 	fwrite(root_dir, sizeof(root_dir), 1, ptr_file);
 
@@ -79,7 +79,7 @@ void exit_and_save(void){
 uint16_t fat_get_free_cluster(void){
 	uint16_t i;
 	for(i = FIRST_CLUSTER; i < NUM_CLUSTER && fat[i] != FREE_CLUSTER; i++);
-	
+
 	if(i == NUM_CLUSTER){
 		errno = ENOSPC;
 		return -1;
@@ -90,38 +90,38 @@ uint16_t fat_get_free_cluster(void){
 data_cluster *read_data_cluster(uint16_t first_block){
 	/* Lendo os dados no disco. */
 	FILE *file_ptr = fopen(fat_name, "rb");
-	
+
 	fseek(file_ptr, first_block * sizeof(data_cluster), SEEK_SET);
-	
+
 	data_cluster *cluster;
-	
+
 	if(first_block == 0x09){
-		cluster = (data_cluster *)root_dir;
+		cluster = (data_cluster *) root_dir;
 	}else{
 		//TO-DO: usar a FAT pra ler mais clusters caso o arquivo seja grande.
 		cluster = &clusters[first_block - FIRST_CLUSTER];
 	}
-	
+
 	fread(cluster, sizeof(data_cluster), 1, file_ptr);
 
 	fclose(file_ptr);
-	
+
 	return cluster;
 }
 
 void write_data_cluster(uint16_t first_block){
 	/* Atualizando a partição. */
 	FILE *file_ptr = fopen(fat_name, "rb+");
-	
+
 	data_cluster *cluster;
-	
+
 	if(first_block == 0x09){
-		cluster = (data_cluster *)root_dir;
+		cluster = (data_cluster *) root_dir;
 	}else{
 		//TO-DO: usar a FAT pra ler mais clusters caso o arquivo seja grande.
 		cluster = &clusters[first_block - FIRST_CLUSTER];
 	}
-	
+
 	fseek(file_ptr, first_block * sizeof(data_cluster), SEEK_SET);
 	fwrite(cluster, sizeof(data_cluster), 1, file_ptr);
 
@@ -141,12 +141,12 @@ dir_entry_t *search_file(const char *pathname, uint8_t attributes){
 		errno = EINVAL;
 		return NULL;
 	}
-	
+
 	/* Se paathname for '/', então não precisa ser procurado. */
 	if(strcmp(pathname, "/") == 0){
 		return &root_dir[0];
 	}
-	
+
 	const char delim[2] = "/";
 	char *token;
 
@@ -208,7 +208,4 @@ dir_entry_t *search_file(const char *pathname, uint8_t attributes){
 
 		search_name = token;
 	}
-	
-	//TO-DO: talvez inútil.
-	return NULL;
 }

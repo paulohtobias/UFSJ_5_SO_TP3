@@ -8,10 +8,10 @@ void cd(const char *pathname){
 		perror(pathname);
 		return;
 	}
-	
+
 	/* Atualizando o diretório corrente. */
 	g_current_dir = read_data_cluster(dir_entry->first_block)->dir;
-	
+
 	/* Atualizando o caminho. */
 	const char *tmp = strrchr(pathname, '/');
 	if(tmp == NULL){
@@ -28,13 +28,13 @@ void stat(const char *pathname){
 		perror(pathname);
 		return;
 	}
-	
+
 	printf("  File: '%s'\n"
-			"  Size: %d \t Tipo: %s\n"
-			"  First Block: 0x%02x (%d)\n",
-			dir_entry->filename, dir_entry->size,
-			(dir_entry->attributes == ATTR_DIR)?"Directory":"File",
-			dir_entry->first_block, dir_entry->first_block);
+		"  Size: %d \t Tipo: %s\n"
+		"  First Block: 0x%02x (%d)\n",
+		dir_entry->filename, dir_entry->size,
+		(dir_entry->attributes == ATTR_DIR) ? "Directory" : "File",
+		dir_entry->first_block, dir_entry->first_block);
 }
 
 void ls(const char *pathname){
@@ -75,7 +75,7 @@ void mkdir(const char *pathname){
 		perror(pathname);
 		return;
 	}
-	
+
 	/* Separando o caminho do nome da pasta */
 	char *path;
 	const char *dir_name = strrchr(pathname, '/');
@@ -90,23 +90,23 @@ void mkdir(const char *pathname){
 		path[path_len - 1] = '\0';
 		dir_name++;
 	}
-	
+
 	/* Verificando se o caminho existe */
 	dir_entry = search_file(path, ATTR_DIR);
-	
+
 	/* Error checking. */
 	if(dir_entry == NULL){
 		perror(path);
 		return;
 	}
-	
+
 	/* Encontrando um bloco livre pra adicionar a pasta. */
 	uint16_t cluster_livre;
 	if((cluster_livre = fat_get_free_cluster()) == -1){
 		perror("mkdir");
 		return;
 	}
-	
+
 	/* Encontrando uma posição vazia para a nova pasta. */
 	int i;
 	dir_entry_t *dir = read_data_cluster(dir_entry->first_block)->dir;
@@ -115,32 +115,32 @@ void mkdir(const char *pathname){
 		printf("'%s' is full.\n", path);
 		return;
 	}
-	
+
 	/* Inserindo o novo diretório dentro do diretório pai. */
 	set_entry(&dir[i], dir_name, ATTR_DIR, cluster_livre, CLUSTER_SIZE);
 	write_data_cluster(dir_entry->first_block);
-	
+
 	/* Atualizando a fat */
 	fat[cluster_livre] = EOF;
-	
+
 	/* Criando os diretórios '.' e '..' */
 	dir = read_data_cluster(cluster_livre)->dir;
 	set_entry(&dir[0], ".", ATTR_DIR, cluster_livre, CLUSTER_SIZE);
 	set_entry(&dir[1], "..", ATTR_DIR, dir_entry->first_block, CLUSTER_SIZE);
 	write_data_cluster(cluster_livre);
-	
+
 	free(path);
 }
 
 char **shell_parse_command(char *command, int *argc){
 	char **argv = malloc(3 * sizeof(char *));
-	
-	*argc = 0;
-	
+
+	*argc = 1;
+
 	argv[0] = NULL;
 	argv[1] = NULL;
 	argv[2] = NULL;
-	
+
 	/* Obtendo o primeiro parâmetro: o nome da função. */
 	char *temp = command;
 	command = strchr(command, ' ');
@@ -151,7 +151,7 @@ char **shell_parse_command(char *command, int *argc){
 	*command++ = '\0';
 	argv[0] = malloc(command - temp);
 	strcpy(argv[0], temp);
-	
+
 	/* Autômato para processar os argumentos. */
 	int DFA[3][3] = {
 		{-1, 2, 1},
@@ -159,20 +159,14 @@ char **shell_parse_command(char *command, int *argc){
 		{2, 0, 2}
 	};
 	int state = 0;
-	
+
 	int i, j = 0;
-	*argc = 1;
 	for(i = 0; command[i] != '\0' && (*argc) < 4; i++){
 		/* Copia o argumento para a argv. */
 		if(argv[(*argc)] == NULL){
 			argv[(*argc)] = malloc(1024); /* Tamanho escolhido abitrariamente. */
 		}
-		
-		if(!((state == 0 || state == 2) && command[i] == '\'')){
-			argv[(*argc)][j++] = command[i];
-			argv[(*argc)][j] = '\0'; /* Garantindo que terá um \0 no final da string. */
-		}
-		
+
 		/*
 		 * Conversão do caractere para um símbolo válido no autômato.
 		 * espaço em branco: 0
@@ -187,9 +181,16 @@ char **shell_parse_command(char *command, int *argc){
 		}else{
 			s = 2;
 		}
+
+		/* Leitura do caractere para o argumento. */
+		if(s == 2 || (state == 2 && s == 0)){
+			argv[(*argc)][j++] = command[i];
+			argv[(*argc)][j] = '\0'; /* Garantindo que terá um \0 no final da string. */
+		}
+
 		/* Faz a transição no autômato. */
 		state = DFA[state][s];
-		
+
 		/* Argumento inválido. */
 		if(state == -1){
 			errno = EINVAL;
@@ -203,14 +204,23 @@ char **shell_parse_command(char *command, int *argc){
 			}
 		}
 	}
-	
+	(*argc)++;
+
 	return argv;
 }
 
 void shell_process_command(char* command){
 	int argc;
 	char **argv = shell_parse_command(command, &argc);
-	
+
+	/* Ignorando uma possível / ao final do caminho. */
+	if(argc > 1){
+		size_t len = strlen(argv[1]);
+		if(argv[1][len - 1] == '/'){
+			argv[1][len - 1] = '\0';
+		}
+	}
+
 	if(strcmp("init", argv[0]) == 0){
 		init();
 		return;
@@ -242,7 +252,7 @@ void shell_process_command(char* command){
 	}
 	if(strcmp("fat", argv[0]) == 0){
 		int i;
-		for(i=0; i<4096; i++){
+		for(i = 0; i < NUM_CLUSTER; i++){
 			if(fat[i] != 0){
 				printf("%4d: 0x%04x\n", i, fat[i]);
 			}

@@ -2,10 +2,7 @@
  * (FEITO) incluir . e .. na lista de diretórios.
  ? (FEITO) resolver caminhos relativos.
 	. variável global current_dir;
- * verificar se uma barra no final de um argumento fode com a função search.
-
-=======================================
-pensar melhor em como ler e escrever os clusters.
-
- * a função set_entry não vai mais escrever no disco.
- * criar uma função nova para atualizar um cluster específico.
+ * (FEITO) verificar se uma barra no final de um argumento fode com a função search.
+ * (FEITO) pensar melhor em como ler e escrever os clusters.
+	* a função set_entry não vai mais escrever no disco.
+	* criar uma função nova para atualizar um cluster específico.
