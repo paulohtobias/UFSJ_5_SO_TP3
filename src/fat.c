@@ -134,6 +134,59 @@ void set_entry(dir_entry_t *entry, const char *filename, uint8_t attributes, uin
 	entry->size = size;
 }
 
+dir_entry_t *create_entry(const char *pathname, uint16_t *cluster_livre, uint8_t attribute, int recursive){
+	/* Separando o caminho do nome do arquivo */
+	char *path;
+	const char *entry_name = strrchr(pathname, '/');
+	if(entry_name == NULL){
+		path = malloc(2);
+		strcpy(path, ".");
+		entry_name = pathname;
+	}else{
+		size_t path_len = entry_name - pathname + 2;
+		path = malloc(path_len);
+		strncpy(path, pathname, path_len - 1);
+		path[path_len - 1] = '\0';
+		entry_name++;
+	}
+
+	/* Verificando se o caminho existe */
+	dir_entry_t *dir_entry = search_file(path, ATTR_DIR);
+
+	/* Error checking. */
+	if(dir_entry == NULL){
+		perror(path);
+		return 0;
+	}
+	
+	/* Encontrando um bloco livre pra adicionar o arquivo. */
+	if((*cluster_livre = fat_get_free_cluster()) == -1){
+		perror("create_entry");
+		return 0;
+	}
+
+	/* Encontrando uma posição vazia no diretório pai para o arquivo. */
+	int i;
+	dir_entry_t *dir = read_data_cluster(dir_entry->first_block)->dir;
+	for(i = 0; i < ENTRY_BY_CLUSTER && dir[i].filename[0] != '\0'; i++);
+	if(i == ENTRY_BY_CLUSTER){
+		printf("'%s' is full.\n", path);
+		free(path);
+		return 0;
+	}
+
+	/* Inserindo o novo diretório dentro do diretório pai. */
+	set_entry(&dir[i], entry_name, attribute, *cluster_livre, CLUSTER_SIZE);
+	write_data_cluster(dir_entry->first_block);
+
+	/* Atualizando a fat */
+	fat[*cluster_livre] = EOF;
+	
+	free(path);
+	
+	return dir_entry;
+}
+
 dir_entry_t *search_file(const char *pathname, uint8_t attributes){
 	if(pathname == NULL){
 		errno = EINVAL;
