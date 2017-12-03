@@ -17,7 +17,7 @@ void cd(const char *pathname){
 	if(tmp == NULL){
 		tmp = pathname;
 	}
-	strcpy(g_current_dir_name, tmp + (tmp[0] == '/'));
+	strcpy(g_current_dir_name, tmp + (tmp[0] == '/' && tmp[1] != '\0'));
 }
 
 void stat(const char *pathname){
@@ -174,14 +174,14 @@ char **shell_parse_command(char *command, int *argc){
 	/* Autômato para processar os argumentos. */
 	int DFA[3][3] = {
 		{-1, 2, 1},
-		{0, -1, 1},
-		{2, 0, 2}
+		{0, 2, 1},
+		{2, 1, 2}
 	};
 	int state = 0;
 
 	int i, j = 0;
 	for(i = 0; command[i] != '\0'; i++){
-		/* Copia o argumento para a argv. */
+		/* Aloca mais um argumento, caso necessário. */
 		if(argv[(*argc)] == NULL){
 			argv[(*argc)] = malloc(1024); /* Tamanho escolhido abitrariamente. */
 		}
@@ -201,7 +201,7 @@ char **shell_parse_command(char *command, int *argc){
 			s = 2;
 		}
 
-		/* Leitura do caractere para o argumento. */
+		/* Copia o caractere para o argv. */
 		if(s == 2 || (state == 2 && s == 0)){
 			argv[(*argc)][j++] = command[i];
 			argv[(*argc)][j] = '\0'; /* Garantindo que terá um \0 no final da string. */
@@ -245,7 +245,7 @@ void shell_process_command(char* command){
 	/* Ignorando uma possível / ao final do caminho. */
 	if(argc > 1){
 		size_t len = strlen(argv[1]);
-		if(argv[1][len - 1] == '/'){
+		if(len > 1 && argv[1][len - 1] == '/'){
 			argv[1][len - 1] = '\0';
 		}
 	}
