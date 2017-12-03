@@ -9,7 +9,7 @@ void stat(const char *pathname);
 
 void ls(const char *pathname);
 
-void mkdir(const char *pathname);
+void mkdir(int argc, char **argv);
 
 char **shell_parse_command(char *command, int *argc);
 

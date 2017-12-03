@@ -65,22 +65,28 @@ void ls(const char *pathname){
 	printf("\n");
 }
 
-void mkdir(const char *pathname){
+void mkdir(int argc, char **argv){
+	/* Error checking. */
+	if(argc < 2){
+		printf("mkdir: missing operand.\n");
+		return;
+	}
+	
 	/* Se a pasta já existe, então não é preciso fazer nada. */
-	dir_entry_t *dir_entry = search_file(pathname, ATTR_DIR);
+	dir_entry_t *dir_entry = search_file(argv[1], ATTR_DIR);
 	if(dir_entry != NULL){
-		printf("'%s' already exists.\n", pathname);
+		printf("'%s' already exists.\n", argv[1]);
 		return;
 	}else if(errno != ENOENT){
-		perror(pathname);
+		perror(argv[1]);
 		return;
 	}
 
 	/* Cria uma entrada diretório no diretório pai. */
 	uint16_t cluster_livre;
-	dir_entry = create_entry(pathname, &cluster_livre, ATTR_DIR, 0);
+	dir_entry = create_entry(argv[1], &cluster_livre, ATTR_DIR, 0);
 	if(cluster_livre == 0){
-		fprintf(stderr, "mkdir: couldn't create '%s'.\n", pathname);
+		fprintf(stderr, "mkdir: couldn't create '%s'.\n", argv[1]);
 		return;
 	}
 
@@ -219,7 +225,7 @@ void shell_process_command(char* command){
 		return;
 	}
 	if(strcmp("mkdir", argv[0]) == 0){
-		mkdir(argv[1]);
+		mkdir(argc, argv);
 		return;
 	}
 	if(strcmp("exit", argv[0]) == 0){
