@@ -88,6 +88,18 @@ void ls(int argc, char **argv){
 }
 
 dir_entry_t *create_entry(const char *pathname, uint16_t *cluster_livre, uint8_t attribute, int recursive){
+	/* Se a pasta já existe, então não é preciso fazer nada. */
+	dir_entry_t *dir_entry = search_file(pathname, ATTR_DIR);
+	if(dir_entry != NULL){
+		errno = EEXIST;
+		*cluster_livre = 0;
+		return NULL;
+	}else if(errno != ENOENT){
+		perror(pathname);
+		*cluster_livre = 0;
+		return NULL;
+	}
+	
 	/* Separando o caminho do nome do arquivo */
 	char *path;
 	const char *entry_name = strrchr(pathname, '/');
@@ -107,7 +119,7 @@ dir_entry_t *create_entry(const char *pathname, uint16_t *cluster_livre, uint8_t
 	}
 
 	/* Verificando se o caminho existe */
-	dir_entry_t *dir_entry = search_file(path, ATTR_DIR);
+	dir_entry = search_file(path, ATTR_DIR);
 
 	/* Error checking. */
 	if(dir_entry == NULL){
@@ -183,25 +195,18 @@ void mkdir(int argc, char **argv){
 	
 	/* Error checking. */
 	if(optind >= argc){
-		printf("mkdir: missing operand.\n");
-		return;
-	}
-	
-	/* Se a pasta já existe, então não é preciso fazer nada. */
-	dir_entry_t *dir_entry = search_file(argv[optind], ATTR_DIR);
-	if(dir_entry != NULL){
-		printf("'%s' already exists.\n", argv[optind]);
-		return;
-	}else if(errno != ENOENT){
-		perror(argv[1]);
+		fprintf(stderr, "mkdir: missing operand.\n");
 		return;
 	}
 
 	/* Cria uma entrada diretório no diretório pai. */
 	uint16_t cluster_livre;
-	dir_entry = create_entry(argv[optind], &cluster_livre, ATTR_DIR, recursive);
+	dir_entry_t *dir_entry = create_entry(argv[optind], &cluster_livre, ATTR_DIR, recursive);
 	if(cluster_livre == 0){
-		fprintf(stderr, "mkdir: couldn't create '%s'.\n", argv[1]);
+		if(errno == EEXIST && recursive == 1){
+			return;
+		}
+		perror(argv[1]);
 		return;
 	}
 
@@ -210,6 +215,42 @@ void mkdir(int argc, char **argv){
 	set_entry(&dir[0], ".", ATTR_DIR, cluster_livre, CLUSTER_SIZE);
 	set_entry(&dir[1], "..", ATTR_DIR, dir_entry->first_block, CLUSTER_SIZE);
 	write_data_cluster(cluster_livre);
+}
+
+void create_file(int argc, char **argv){
+	/* Verificando se alguma flag foi ativa. */
+	int recursive = 0;
+	int c;
+	
+	optind = 0;
+	while((c = getopt(argc, argv, "rpc:")) != -1){
+		switch(c){
+			case 'r':
+			case 'p':
+				recursive = 1;
+				break;
+			default:
+				fprintf(stderr, "mkdir: invalid option -- '%c'\n", optopt);
+				return;
+		}
+	}
+	
+	/* Error checking. */
+	if(optind >= argc){
+		fprintf(stderr, "mkdir: missing operand.\n");
+		return;
+	}
+
+	/* Cria uma entrada diretório no diretório pai. */
+	uint16_t cluster_livre;
+	create_entry(argv[optind], &cluster_livre, ATTR_FILE, recursive);
+	if(cluster_livre == 0){
+		if(errno == EEXIST && recursive == 1){
+			return;
+		}
+		perror(argv[1]);
+		return;
+	}
 }
 
 char **shell_parse_command(char *command, int *argc){
@@ -333,6 +374,8 @@ void shell_process_command(char* command){
 		ls(argc, argv);
 	}else if(strcmp("mkdir", argv[0]) == 0){
 		mkdir(argc, argv);
+	}else if(strcmp("create", argv[0]) == 0){
+		create_file(argc, argv);
 	}else if(strcmp("exit", argv[0]) == 0){
 		exit_and_save();
 		exit(0);

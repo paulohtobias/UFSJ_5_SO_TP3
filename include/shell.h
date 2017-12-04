@@ -14,6 +14,8 @@ dir_entry_t *create_entry(const char *pathname, uint16_t *cluster_livre, uint8_t
 
 void mkdir(int argc, char **argv);
 
+void create_file(int argc, char **argv);
+
 char **shell_parse_command(char *command, int *argc);
 
 void shell_process_command(char *command);
