@@ -9,6 +9,8 @@ void stat(const char *pathname);
 
 void ls(const char *pathname);
 
+dir_entry_t *create_entry(const char *pathname, uint16_t *cluster_livre, uint8_t attribute, int recursive);
+
 void mkdir(int argc, char **argv);
 
 char **shell_parse_command(char *command, int *argc);

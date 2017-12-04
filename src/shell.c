@@ -65,6 +65,82 @@ void ls(const char *pathname){
 	printf("\n");
 }
 
+dir_entry_t *create_entry(const char *pathname, uint16_t *cluster_livre, uint8_t attribute, int recursive){
+	/* Separando o caminho do nome do arquivo */
+	char *path;
+	const char *entry_name = strrchr(pathname, '/');
+	if(entry_name == NULL){
+		path = malloc(2);
+		strcpy(path, ".");
+		entry_name = pathname;
+	}else{
+		size_t path_len = entry_name - pathname + 1;
+		path = malloc(path_len + 1);
+		strncpy(path, pathname, path_len);
+		path[path_len] = '\0';
+		if(path_len > 1){
+			path[path_len - 1] = '\0';
+		}
+		entry_name++;
+	}
+
+	/* Verificando se o caminho existe */
+	dir_entry_t *dir_entry = search_file(path, ATTR_DIR);
+
+	/* Error checking. */
+	if(dir_entry == NULL){
+		/* Diretório pai não existe. */
+		if(recursive == 0){
+			perror(path);
+			*cluster_livre = 0;
+			return NULL;
+		}
+		/* Se a flag de recusrivo for verdadeira, então o diretório pai será criado. */
+		else{
+			char **argv = malloc(3 * sizeof(char *));
+			argv[0] = "mkdir";
+			argv[1] = malloc(1024);
+			strcpy(argv[1], path);
+			argv[2] = "-r";
+			mkdir(3, argv);
+			if((dir_entry = search_file(path, ATTR_DIR)) == NULL){
+				perror(path);
+				*cluster_livre = 0;
+				return NULL;
+			}
+		}
+	}
+	
+	/* Encontrando um bloco livre pra adicionar o arquivo. */
+	if((*cluster_livre = fat_get_free_cluster()) == -1){
+		perror("create_entry");
+		*cluster_livre = 0;
+		return NULL;
+	}
+
+	/* Encontrando uma posição vazia no diretório pai para o arquivo. */
+	int i;
+	dir_entry_t *dir = read_data_cluster(dir_entry->first_block)->dir;
+	for(i = 0; i < ENTRY_BY_CLUSTER && dir[i].filename[0] != '\0'; i++);
+	if(i == ENTRY_BY_CLUSTER){
+		printf("'%s' is full.\n", path);
+		free(path);
+		*cluster_livre = 0;
+		return NULL;
+	}
+
+	/* Inserindo o novo diretório dentro do diretório pai. */
+	set_entry(&dir[i], entry_name, attribute, *cluster_livre, CLUSTER_SIZE);
+	write_data_cluster(dir_entry->first_block);
+
+	/* Atualizando a fat */
+	fat[*cluster_livre] = EOF;
+	
+	free(path);
+	
+	return dir_entry;
+}
+
 void mkdir(int argc, char **argv){
 	/* Error checking. */
 	if(argc < 2){
@@ -81,10 +157,16 @@ void mkdir(int argc, char **argv){
 		perror(argv[1]);
 		return;
 	}
+	
+	/* Verifica se é pra criar todas os diretórios não existentes no caminho. */
+	int recursive = 0;
+	if(argc > 2 && strcmp("-r", argv[2]) == 0){
+		recursive = 1;
+	}
 
 	/* Cria uma entrada diretório no diretório pai. */
 	uint16_t cluster_livre;
-	dir_entry = create_entry(argv[1], &cluster_livre, ATTR_DIR, 0);
+	dir_entry = create_entry(argv[1], &cluster_livre, ATTR_DIR, recursive);
 	if(cluster_livre == 0){
 		fprintf(stderr, "mkdir: couldn't create '%s'.\n", argv[1]);
 		return;
@@ -120,14 +202,13 @@ char **shell_parse_command(char *command, int *argc){
 		argv[0] = temp;
 		return argv;
 	}
-	*command = '\0';
+	*command++ = '\0';
 	argv[0] = malloc(command - temp);
 	strcpy(argv[0], temp);
-	*command = ' ';
 
 	/* Autômato para processar os argumentos. */
 	int DFA[4][4] = {
-		{1, 2, 3, -1},
+		{-1, 2, 3, 1},
 		{0, 2, 3, 1},
 		{2, 1, 2, 2},
 		{3, 3, 1, 3}
@@ -159,7 +240,7 @@ char **shell_parse_command(char *command, int *argc){
 		}
 
 		/* Copia o caractere para o argv somente se for um self-loop. */
-		if(state == DFA[state][s]){
+		if(s == 3 || state == DFA[state][s]){
 			argv[(*argc)][j++] = command[i];
 			argv[(*argc)][j] = '\0'; /* Garantindo que terá um \0 no final da string. */
 		}
@@ -197,6 +278,11 @@ char **shell_parse_command(char *command, int *argc){
 void shell_process_command(char* command){
 	int argc;
 	char **argv = shell_parse_command(command, &argc);
+
+	int i;
+	for(i=0; i<argc; i++){
+		printf("argv[%d]: <%s>\n", i, argv[i]);
+	}
 	
 	/* Error checking. */
 	if(argv == NULL){

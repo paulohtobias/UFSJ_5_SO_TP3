@@ -128,63 +128,11 @@ void write_data_cluster(uint16_t first_block){
 
 void set_entry(dir_entry_t *entry, const char *filename, uint8_t attributes, uint16_t first_block, uint32_t size){
 	strncpy(entry->filename, filename, 18);
+	entry->filename[17] = '\0';
 	entry->attributes = attributes;
 	memset(entry->reserved, 0, 7);
 	entry->first_block = first_block;
 	entry->size = size;
-}
-
-dir_entry_t *create_entry(const char *pathname, uint16_t *cluster_livre, uint8_t attribute, int recursive){
-	/* Separando o caminho do nome do arquivo */
-	char *path;
-	const char *entry_name = strrchr(pathname, '/');
-	if(entry_name == NULL){
-		path = malloc(2);
-		strcpy(path, ".");
-		entry_name = pathname;
-	}else{
-		size_t path_len = entry_name - pathname + 2;
-		path = malloc(path_len);
-		strncpy(path, pathname, path_len - 1);
-		path[path_len - 1] = '\0';
-		entry_name++;
-	}
-
-	/* Verificando se o caminho existe */
-	dir_entry_t *dir_entry = search_file(path, ATTR_DIR);
-
-	/* Error checking. */
-	if(dir_entry == NULL){
-		perror(path);
-		return 0;
-	}
-	
-	/* Encontrando um bloco livre pra adicionar o arquivo. */
-	if((*cluster_livre = fat_get_free_cluster()) == -1){
-		perror("create_entry");
-		return 0;
-	}
-
-	/* Encontrando uma posição vazia no diretório pai para o arquivo. */
-	int i;
-	dir_entry_t *dir = read_data_cluster(dir_entry->first_block)->dir;
-	for(i = 0; i < ENTRY_BY_CLUSTER && dir[i].filename[0] != '\0'; i++);
-	if(i == ENTRY_BY_CLUSTER){
-		printf("'%s' is full.\n", path);
-		free(path);
-		return 0;
-	}
-
-	/* Inserindo o novo diretório dentro do diretório pai. */
-	set_entry(&dir[i], entry_name, attribute, *cluster_livre, CLUSTER_SIZE);
-	write_data_cluster(dir_entry->first_block);
-
-	/* Atualizando a fat */
-	fat[*cluster_livre] = EOF;
-	
-	free(path);
-	
-	return dir_entry;
 }
 
 dir_entry_t *search_file(const char *pathname, uint8_t attributes){
@@ -203,8 +151,12 @@ dir_entry_t *search_file(const char *pathname, uint8_t attributes){
 
 	/* Copiando a string para uma temporária. */
 	size_t len = strlen(pathname);
+	if(len > 1 && pathname[len -1] == '/'){
+		len--;
+	}
 	char *pathname_c = malloc(len + 1);
-	strcpy(pathname_c, pathname);
+	strncpy(pathname_c, pathname, len);
+	pathname_c[len] = '\0';
 
 	token = strtok(pathname_c, delim);
 
@@ -215,7 +167,9 @@ dir_entry_t *search_file(const char *pathname, uint8_t attributes){
 		current_dir = root_dir;
 	}
 
-	char *search_name = token;
+	char search_name[18];
+	strncpy(search_name, token, 18);
+	search_name[17] = '\0';
 	while(token != NULL){
 		token = strtok(NULL, delim);
 
@@ -257,7 +211,8 @@ dir_entry_t *search_file(const char *pathname, uint8_t attributes){
 			return NULL;
 		}
 
-		search_name = token;
+		strncpy(search_name, token, 18);
+		search_name[17] = '\0';
 	}
 	
 	errno = ENOENT;

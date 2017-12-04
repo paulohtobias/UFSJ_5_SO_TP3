@@ -61,8 +61,6 @@ data_cluster *read_data_cluster(uint16_t fist_block);
 
 void write_data_cluster(uint16_t first_block);
 
-dir_entry_t *create_entry(const char *pathname, uint16_t *cluster_livre, uint8_t attribute, int recursive);
-
 void set_entry(dir_entry_t *entry, const char *filename, uint8_t attributes, uint16_t first_block, uint32_t size);
 
 dir_entry_t *search_file(const char *pathname, uint8_t attributes);
