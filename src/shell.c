@@ -303,53 +303,41 @@ void shell_process_command(char* command){
 	char **argv = shell_parse_command(command, &argc);
 
 	int i;
-	for(i=0; i<argc; i++){
+	/*for(i=0; i<argc; i++){
 		printf("argv[%d]: <%s>\n", i, argv[i]);
-	}
+	}*/
 	
 	/* Error checking. */
 	if(argv == NULL){
 		perror("shell_process_command");
-		return;
-	}
-
-	if(strcmp("init", argv[0]) == 0){
+	}else if(strcmp("init", argv[0]) == 0){
 		init();
-		return;
-	}
-	if(strcmp("load", argv[0]) == 0){
+	}else if(strcmp("load", argv[0]) == 0){
 		load();
-		return;
-	}
-	if(strcmp("cd", argv[0]) == 0){
+	}else if(strcmp("cd", argv[0]) == 0){
 		cd(argv[1]);
-		return;
-	}
-	if(strcmp("stat", argv[0]) == 0){
+	}else if(strcmp("stat", argv[0]) == 0){
 		stat(argv[1]);
-		return;
-	}
-	if(strcmp("ls", argv[0]) == 0){
+	}else if(strcmp("ls", argv[0]) == 0){
 		ls(argc, argv);
-		return;
-	}
-	if(strcmp("mkdir", argv[0]) == 0){
+	}else if(strcmp("mkdir", argv[0]) == 0){
 		mkdir(argc, argv);
-		return;
-	}
-	if(strcmp("exit", argv[0]) == 0){
+	}else if(strcmp("exit", argv[0]) == 0){
 		exit_and_save();
 		exit(0);
-		return;
-	}
-	if(strcmp("fat", argv[0]) == 0){
-		int i;
+	}else if(strcmp("fat", argv[0]) == 0){
 		for(i = 0; i < NUM_CLUSTER; i++){
 			if(fat[i] != 0){
 				printf("%4d: 0x%04x\n", i, fat[i]);
 			}
 		}
-		return;
+	}else{
+		printf("%s: command not found\n", argv[0]);
 	}
-	printf("%s: command not found\n", argv[0]);
+
+	/* Liberando a matriz da memória. */
+	for(i = 0; i < argc; i++){
+		free(argv[i]);
+	}
+	free(argv);
 }
