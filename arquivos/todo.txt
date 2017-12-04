@@ -1,4 +1,5 @@
- * usar argc e argc no ls pra mostrar arquivos "ocultos" e mostrar em lista.
+ * error checking nas função read e write data_cluster.
+ * (FEITO) usar argc e argc no ls pra mostrar arquivos "ocultos" e mostrar em lista.
  * (FEITO) manter lista de blocos livres (usar lista encadeada).
  * (FEITO) incluir . e .. na lista de diretórios.
  ? (FEITO) resolver caminhos relativos.

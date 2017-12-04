@@ -20,6 +20,8 @@ void write_file(int argc, char **argv);
 
 void read_file(int argc, char **argv);
 
+void append(int argc, char **argv);
+
 char **shell_parse_command(char *command, int *argc);
 
 void shell_process_command(char *command);

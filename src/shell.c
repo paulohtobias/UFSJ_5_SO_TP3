@@ -271,6 +271,9 @@ void write_file(int argc, char **argv){
 	size_t len = strlen(argv[2]) + 1; /* O '\0' precisa entrar na conta. */
 	int num_clusters = (len / CLUSTER_SIZE) + 1;
 	
+	/* Atualiza o tamanho do arquivo. */
+	dir_entry->size = num_clusters * CLUSTER_SIZE;
+	
 	/* Libera os clusters que não serão mais necessários, caso haja algum. */
 	int i = 0;
 	uint16_t cluster = fat[dir_entry->first_block];
@@ -287,9 +290,18 @@ void write_file(int argc, char **argv){
 	cluster = dir_entry->first_block;
 	char *data = NULL;
 	for(i = 0; i < num_clusters; i++){
+		/* Se atingiu o último cluster, então aloque mais. */
+		if(cluster == END_OF_FILE){
+			uint16_t free_cluster = fat_get_free_cluster();
+			fat[cluster] = free_cluster;
+			fat[free_cluster] = END_OF_FILE;
+			cluster = fat[cluster];
+		}
+		
 		data = (char *)read_data_cluster(cluster)->data;
 		strncpy(data, &argv[2][i * CLUSTER_SIZE], CLUSTER_SIZE);
 		write_data_cluster(cluster);
+		
 		cluster = fat[cluster];
 	}
 }
@@ -318,6 +330,81 @@ void read_file(int argc, char **argv){
 	}while(cluster != END_OF_FILE);
 	printf("\n");
 	
+}
+
+void append(int argc, char **argv){
+	/* Error checking. */
+	if(argc < 3){
+		fprintf(stderr, "append: missing operands: %d.\n", 3 - argc);
+		return;
+	}
+	
+	/* Verifica se o arquivo existe. */
+	dir_entry_t *dir_entry = search_file(argv[1], ATTR_FILE);
+	if(dir_entry == NULL){
+		perror(argv[1]);
+		return;
+	}
+	
+	char *string = argv[2];
+	
+	/* Calcula a quantidade de clusters necessários para a nova string. */
+	size_t len = strlen(string) + 1; /* O '\0' precisa entrar na conta. */
+	int num_clusters = (len / CLUSTER_SIZE) + 1;
+	
+	/* Escrevendo os dados. */
+	int i = 0;
+	uint16_t cluster;
+	char *data = NULL;
+	
+	/* O append começa a escrever a partir do último cluster. Portanto, é 
+	 * preciso achá-lo e, além disso, descobrir a partir de qual posição do
+	 * cluster será feita a escrita.
+	 */
+	
+	/* Encontra o último cluster ocupado. */
+	for(cluster = dir_entry->first_block; fat[cluster] != END_OF_FILE; cluster = fat[cluster]);
+	/* Posição no cluster onde a nova string começará. */
+	data = (char *)read_data_cluster(cluster)->data;
+	int start = strlen(data);
+	
+	/* Concatendo as duas strings. */
+	i = 0;
+	do{
+		data[start + i] = *string++;
+		i++;
+	}while(*string != '\0' && start + i < CLUSTER_SIZE);
+	write_data_cluster(cluster);
+	
+	/* Se a string nova coube no cluster, então não é preciso fazer mais nada. */
+	if(*string == '\0'){
+		return;
+	}
+	
+	/* Aloca mais um cluster para o arquivo. */
+	uint16_t free_cluster = fat_get_free_cluster();
+	fat[cluster] = free_cluster;
+	fat[free_cluster] = END_OF_FILE;
+	cluster = fat[cluster];
+	dir_entry->size += CLUSTER_SIZE;
+	
+	/* Adicionando o resto da string. */
+	for(i = 0; i < num_clusters; i++){
+		/* Se atingiu o último cluster, então aloque mais. */
+		if(cluster == END_OF_FILE){
+			uint16_t free_cluster = fat_get_free_cluster();
+			fat[cluster] = free_cluster;
+			fat[free_cluster] = END_OF_FILE;
+			
+			dir_entry->size += CLUSTER_SIZE;
+		}
+		
+		data = (char *)read_data_cluster(cluster)->data;
+		strncpy(data, &string[i * CLUSTER_SIZE], CLUSTER_SIZE);
+		write_data_cluster(cluster);
+		
+		cluster = fat[cluster];
+	}
 }
 
 char **shell_parse_command(char *command, int *argc){
@@ -362,6 +449,7 @@ char **shell_parse_command(char *command, int *argc){
 		/* Aloca mais um argumento, caso necessário. */
 		if(argv[(*argc)] == NULL){
 			argv[(*argc)] = malloc(1024); /* Tamanho escolhido abitrariamente. */
+			argv[(*argc)][0] = '\0';
 		}
 
 		/*
@@ -450,6 +538,8 @@ void shell_process_command(char* command){
 		write_file(argc, argv);
 	}else if(strcmp("read", argv[0]) == 0){
 		read_file(argc, argv);
+	}else if(strcmp("append", argv[0]) == 0){
+		append(argc, argv);
 	}else if(strcmp("exit", argv[0]) == 0){
 		exit_and_save();
 		exit(0);
