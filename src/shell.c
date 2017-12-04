@@ -38,13 +38,11 @@ void stat(const char *pathname){
 }
 
 void ls(int argc, char **argv){
-	int i;
-	
 	/* Verificando se alguma flag foi ativa. */
 	int all = 0, list_mode = 0;
 	int c;
 	
-	optind = 1;
+	optind = 0;
 	while((c = getopt(argc, argv, "al")) != -1){
 		switch(c){
 			case 'a':
@@ -74,6 +72,7 @@ void ls(int argc, char **argv){
 
 	dir_entry_t *dir = read_data_cluster(dir_entry->first_block)->dir;
 
+	int i;
 	for(i = 0; i < ENTRY_BY_CLUSTER; i++){
 		if(dir[i].filename[0] != '\0' && (all == 1 || dir[i].filename[0] != '.')){
 			if(dir[i].attributes == ATTR_DIR){
@@ -165,31 +164,42 @@ dir_entry_t *create_entry(const char *pathname, uint16_t *cluster_livre, uint8_t
 }
 
 void mkdir(int argc, char **argv){
+	/* Verificando se alguma flag foi ativa. */
+	int recursive = 0;
+	int c;
+	
+	optind = 0;
+	while((c = getopt(argc, argv, "rp")) != -1){
+		switch(c){
+			case 'r':
+			case 'p':
+				recursive = 1;
+				break;
+			default:
+				fprintf(stderr, "mkdir: invalid option -- '%c'\n", optopt);
+				return;
+		}
+	}
+	
 	/* Error checking. */
-	if(argc < 2){
+	if(optind >= argc){
 		printf("mkdir: missing operand.\n");
 		return;
 	}
 	
 	/* Se a pasta já existe, então não é preciso fazer nada. */
-	dir_entry_t *dir_entry = search_file(argv[1], ATTR_DIR);
+	dir_entry_t *dir_entry = search_file(argv[optind], ATTR_DIR);
 	if(dir_entry != NULL){
-		printf("'%s' already exists.\n", argv[1]);
+		printf("'%s' already exists.\n", argv[optind]);
 		return;
 	}else if(errno != ENOENT){
 		perror(argv[1]);
 		return;
 	}
-	
-	/* Verifica se é pra criar todas os diretórios não existentes no caminho. */
-	int recursive = 0;
-	if(argc > 2 && strcmp("-r", argv[2]) == 0){
-		recursive = 1;
-	}
 
 	/* Cria uma entrada diretório no diretório pai. */
 	uint16_t cluster_livre;
-	dir_entry = create_entry(argv[1], &cluster_livre, ATTR_DIR, recursive);
+	dir_entry = create_entry(argv[optind], &cluster_livre, ATTR_DIR, recursive);
 	if(cluster_livre == 0){
 		fprintf(stderr, "mkdir: couldn't create '%s'.\n", argv[1]);
 		return;
@@ -222,7 +232,8 @@ char **shell_parse_command(char *command, int *argc){
 	char *temp = command;
 	command = strchr(command, ' ');
 	if(command == NULL){ /* Comando sem argumentos. */
-		argv[0] = temp;
+		argv[0] = malloc(20);
+		strcpy(argv[0], temp);
 		return argv;
 	}
 	*command++ = '\0';
