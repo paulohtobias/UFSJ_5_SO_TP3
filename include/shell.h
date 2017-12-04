@@ -7,7 +7,7 @@ void cd(const char *pathname);
 
 void stat(const char *pathname);
 
-void ls(const char *pathname);
+void ls(int arc, char **argv);
 
 dir_entry_t *create_entry(const char *pathname, uint16_t *cluster_livre, uint8_t attribute, int recursive);
 

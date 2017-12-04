@@ -37,29 +37,45 @@ void stat(const char *pathname){
 		dir_entry->first_block, dir_entry->first_block);
 }
 
-void ls(const char *pathname){
+void ls(int argc, char **argv){
 	dir_entry_t *dir_entry;
-	if(pathname == NULL){
+	if(argc < 2){
 		dir_entry = search_file(".", ATTR_DIR);
 	}else{
-		dir_entry = search_file(pathname, ATTR_DIR);
+		dir_entry = search_file(argv[1], ATTR_DIR);
 	}
 
 	/* Error checking. */
 	if(dir_entry == NULL){
-		perror(pathname);
+		perror(argv[1]);
 		return;
 	}
 
 	dir_entry_t *dir = read_data_cluster(dir_entry->first_block)->dir;
 
 	int i;
+	/* Verificando se alguma flag foi ativa. */
+	int all = 0, list_mode = 0;
+	if(argc > 2 && argv[2][0] == '-'){
+		for(i=1; argv[2][i] != '\0'; i++){
+			if(argv[2][i] == 'a'){
+				all = 1;
+			}else if(argv[2][i] == 'l'){
+				list_mode = 1;
+			}else{
+				fprintf(stderr, "ls: Unknown option '-%c'.\n", argv[2][i]);
+				return;
+			}
+		}
+	}
+
 	for(i = 0; i < ENTRY_BY_CLUSTER; i++){
-		if(dir[i].filename[0] != '\0'){
+		if(dir[i].filename[0] != '\0' && (all == 1 || dir[i].filename[0] != '.')){
 			if(dir[i].attributes == ATTR_DIR){
 				printf("\033[1;36m");
 			}
-			printf("%s\033[0m ", dir[i].filename);
+			printf("%s\033[0m%c", dir[i].filename, list_mode?'\n':' ');
+			
 		}
 	}
 	printf("\n");
@@ -307,7 +323,7 @@ void shell_process_command(char* command){
 		return;
 	}
 	if(strcmp("ls", argv[0]) == 0){
-		ls(argv[1]);
+		ls(argc, argv);
 		return;
 	}
 	if(strcmp("mkdir", argv[0]) == 0){
