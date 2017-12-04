@@ -168,7 +168,7 @@ dir_entry_t *create_entry(const char *pathname, uint16_t *cluster_livre, uint8_t
 	write_data_cluster(dir_entry->first_block);
 
 	/* Atualizando a fat */
-	fat[*cluster_livre] = EOF;
+	fat[*cluster_livre] = END_OF_FILE;
 	
 	free(path);
 	
@@ -230,14 +230,14 @@ void create_file(int argc, char **argv){
 				recursive = 1;
 				break;
 			default:
-				fprintf(stderr, "mkdir: invalid option -- '%c'\n", optopt);
+				fprintf(stderr, "create: invalid option -- '%c'\n", optopt);
 				return;
 		}
 	}
 	
 	/* Error checking. */
 	if(optind >= argc){
-		fprintf(stderr, "mkdir: missing operand.\n");
+		fprintf(stderr, "create: missing operand.\n");
 		return;
 	}
 
@@ -251,6 +251,73 @@ void create_file(int argc, char **argv){
 		perror(argv[1]);
 		return;
 	}
+}
+
+void write_file(int argc, char **argv){
+	/* Error checking. */
+	if(argc < 3){
+		fprintf(stderr, "write: missing operands: %d.\n", 3 - argc);
+		return;
+	}
+	
+	/* Verifica se o arquivo existe. */
+	dir_entry_t *dir_entry = search_file(argv[1], ATTR_FILE);
+	if(dir_entry == NULL){
+		perror(argv[1]);
+		return;
+	}
+	
+	/* Calcula a quantidade de clusters necessários para a nova string. */
+	size_t len = strlen(argv[2]) + 1; /* O '\0' precisa entrar na conta. */
+	int num_clusters = (len / CLUSTER_SIZE) + 1;
+	
+	/* Libera os clusters que não serão mais necessários, caso haja algum. */
+	int i = 0;
+	uint16_t cluster = fat[dir_entry->first_block];
+	while(i < num_clusters && cluster != END_OF_FILE){
+		cluster = fat[cluster];
+		i++;
+		if(i == num_clusters && cluster != END_OF_FILE){
+			fat_free_cluster(cluster);
+			break;
+		}
+	}
+	
+	/* Escrevendo os dados. */
+	cluster = dir_entry->first_block;
+	char *data = NULL;
+	for(i = 0; i < num_clusters; i++){
+		data = (char *)read_data_cluster(cluster)->data;
+		strncpy(data, &argv[2][i * CLUSTER_SIZE], CLUSTER_SIZE);
+		write_data_cluster(cluster);
+		cluster = fat[cluster];
+	}
+}
+
+void read_file(int argc, char **argv){
+	/* Error checking. */
+	if(argc < 2){
+		fprintf(stderr, "read: missing file.\n");
+		return;
+	}
+	
+	/* Verifica se o arquivo existe. */
+	dir_entry_t *dir_entry = search_file(argv[1], ATTR_FILE);
+	if(dir_entry == NULL){
+		perror(argv[1]);
+		return;
+	}
+	
+	/* Lendo os dados. */
+	uint16_t cluster = dir_entry->first_block;
+	char *data = NULL;
+	do{
+		data = (char *)read_data_cluster(cluster)->data;
+		printf("%s", data);
+		cluster = fat[cluster];
+	}while(cluster != END_OF_FILE);
+	printf("\n");
+	
 }
 
 char **shell_parse_command(char *command, int *argc){
@@ -362,7 +429,10 @@ void shell_process_command(char* command){
 	/* Error checking. */
 	if(argv == NULL){
 		perror("shell_process_command");
-	}else if(strcmp("init", argv[0]) == 0){
+		return;
+	}
+	
+	if(strcmp("init", argv[0]) == 0){
 		init();
 	}else if(strcmp("load", argv[0]) == 0){
 		load();
@@ -376,6 +446,10 @@ void shell_process_command(char* command){
 		mkdir(argc, argv);
 	}else if(strcmp("create", argv[0]) == 0){
 		create_file(argc, argv);
+	}else if(strcmp("write", argv[0]) == 0){
+		write_file(argc, argv);
+	}else if(strcmp("read", argv[0]) == 0){
+		read_file(argc, argv);
 	}else if(strcmp("exit", argv[0]) == 0){
 		exit_and_save();
 		exit(0);

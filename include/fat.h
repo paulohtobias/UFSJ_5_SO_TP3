@@ -19,6 +19,7 @@
 #define FREE_CLUSTER 0x0000
 #define BOOT_CLUSTER 0xfffd
 #define FAT_CLUSTER 0xfffe
+#define END_OF_FILE 0xffff
 
 #define ATTR_FILE 0
 #define ATTR_DIR 1
@@ -57,9 +58,11 @@ void exit_and_save(void);
 
 uint16_t fat_get_free_cluster(void);
 
-data_cluster *read_data_cluster(uint16_t fist_block);
+void fat_free_cluster(uint16_t first_block);
 
-void write_data_cluster(uint16_t first_block);
+data_cluster *read_data_cluster(uint16_t block);
+
+void write_data_cluster(uint16_t block);
 
 void set_entry(dir_entry_t *entry, const char *filename, uint8_t attributes, uint16_t first_block, uint32_t size);
 

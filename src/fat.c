@@ -19,7 +19,7 @@ void init(void){
 	set_entry(&root_dir[0], ".", ATTR_DIR, 0x0009, CLUSTER_SIZE);
 	set_entry(&root_dir[1], "..", ATTR_DIR, 0x0009, CLUSTER_SIZE);
 
-	fat[i++] = EOF;
+	fat[i++] = END_OF_FILE;
 
 	while(i < NUM_CLUSTER){
 		fat[i++] = FREE_CLUSTER;
@@ -87,18 +87,28 @@ uint16_t fat_get_free_cluster(void){
 	return i;
 }
 
-data_cluster *read_data_cluster(uint16_t first_block){
+void fat_free_cluster(uint16_t first_block){
+	uint16_t current_block = first_block;
+	uint16_t next_block = fat[current_block];
+	while(next_block != END_OF_FILE){
+		fat[current_block] = FREE_CLUSTER;
+		current_block = next_block;
+		next_block = fat[current_block];
+	}
+}
+
+data_cluster *read_data_cluster(uint16_t block){
 	/* Lendo os dados no disco. */
 	FILE *file_ptr = fopen(fat_name, "rb");
 
-	fseek(file_ptr, first_block * sizeof(data_cluster), SEEK_SET);
+	fseek(file_ptr, block * sizeof(data_cluster), SEEK_SET);
 
 	data_cluster *cluster;
 
-	if(first_block == 0x09){
+	if(block == 0x09){
 		cluster = (data_cluster *) root_dir;
 	}else{
-		cluster = &clusters[first_block - FIRST_CLUSTER];
+		cluster = &clusters[block - FIRST_CLUSTER];
 	}
 
 	fread(cluster, sizeof(data_cluster), 1, file_ptr);
@@ -108,19 +118,19 @@ data_cluster *read_data_cluster(uint16_t first_block){
 	return cluster;
 }
 
-void write_data_cluster(uint16_t first_block){
+void write_data_cluster(uint16_t block){
 	/* Atualizando a partição. */
 	FILE *file_ptr = fopen(fat_name, "rb+");
 
 	data_cluster *cluster;
 
-	if(first_block == 0x09){
+	if(block == 0x09){
 		cluster = (data_cluster *) root_dir;
 	}else{
-		cluster = &clusters[first_block - FIRST_CLUSTER];
+		cluster = &clusters[block - FIRST_CLUSTER];
 	}
 
-	fseek(file_ptr, first_block * sizeof(data_cluster), SEEK_SET);
+	fseek(file_ptr, block * sizeof(data_cluster), SEEK_SET);
 	fwrite(cluster, sizeof(data_cluster), 1, file_ptr);
 
 	fclose(file_ptr);
