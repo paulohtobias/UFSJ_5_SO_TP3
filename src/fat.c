@@ -82,7 +82,7 @@ uint16_t fat_get_free_cluster(void){
 
 	if(i == NUM_CLUSTER){
 		errno = ENOSPC;
-		return -1;
+		return 0xffff;
 	}
 	return i;
 }

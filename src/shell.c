@@ -146,7 +146,7 @@ dir_entry_t *create_entry(const char *pathname, uint16_t *cluster_livre, uint8_t
 	}
 	
 	/* Encontrando um bloco livre pra adicionar o arquivo. */
-	if((*cluster_livre = fat_get_free_cluster()) == -1){
+	if((*cluster_livre = fat_get_free_cluster()) == 0xffff){
 		perror("create_entry");
 		*cluster_livre = 0;
 		return NULL;
@@ -251,6 +251,11 @@ void create_file(int argc, char **argv){
 		perror(argv[1]);
 		return;
 	}
+	
+	/* Como o arquivo está inicalmente vazio, então o primeiro caractere é '\0'. */
+	char *data = (char *)read_data_cluster(cluster_livre)->data;
+	data[0] = '\0';
+	write_data_cluster(cluster_livre);
 }
 
 void write_file(int argc, char **argv){
@@ -293,6 +298,12 @@ void write_file(int argc, char **argv){
 		/* Se atingiu o último cluster, então aloque mais. */
 		if(cluster == END_OF_FILE){
 			uint16_t free_cluster = fat_get_free_cluster();
+			/* Error checking. */
+			if(free_cluster == 0xffff){
+				perror(argv[1]);
+				return;
+			}
+			
 			fat[cluster] = free_cluster;
 			fat[free_cluster] = END_OF_FILE;
 			cluster = fat[cluster];
@@ -383,6 +394,11 @@ void append(int argc, char **argv){
 	
 	/* Aloca mais um cluster para o arquivo. */
 	uint16_t free_cluster = fat_get_free_cluster();
+	/* Error checking. */
+	if(free_cluster == 0xffff){
+		perror(argv[1]);
+		return;
+	}
 	fat[cluster] = free_cluster;
 	fat[free_cluster] = END_OF_FILE;
 	cluster = fat[cluster];
@@ -393,6 +409,11 @@ void append(int argc, char **argv){
 		/* Se atingiu o último cluster, então aloque mais. */
 		if(cluster == END_OF_FILE){
 			uint16_t free_cluster = fat_get_free_cluster();
+			/* Error checking. */
+			if(free_cluster == 0xffff){
+				perror(argv[1]);
+				return;
+			}
 			fat[cluster] = free_cluster;
 			fat[free_cluster] = END_OF_FILE;
 			
