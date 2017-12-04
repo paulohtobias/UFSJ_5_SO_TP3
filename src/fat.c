@@ -89,11 +89,11 @@ uint16_t fat_get_free_cluster(void){
 
 void fat_free_cluster(uint16_t first_block){
 	uint16_t current_block = first_block;
-	uint16_t next_block = fat[current_block];
-	while(next_block != END_OF_FILE){
+	uint16_t next_block;
+	while(current_block != END_OF_FILE){
+		next_block = fat[current_block];
 		fat[current_block] = FREE_CLUSTER;
 		current_block = next_block;
-		next_block = fat[current_block];
 	}
 }
 
@@ -161,7 +161,7 @@ dir_entry_t *search_file(const char *pathname, uint8_t attributes){
 
 	/* Copiando a string para uma temporária. */
 	size_t len = strlen(pathname);
-	if(len > 1 && pathname[len -1] == '/'){
+	if(len > 1 && pathname[len - 1] == '/'){
 		len--;
 	}
 	char *pathname_c = malloc(len + 1);
@@ -224,7 +224,7 @@ dir_entry_t *search_file(const char *pathname, uint8_t attributes){
 		strncpy(search_name, token, 18);
 		search_name[17] = '\0';
 	}
-	
+
 	errno = ENOENT;
 	return NULL;
 }

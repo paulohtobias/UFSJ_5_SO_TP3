@@ -16,6 +16,8 @@ void mkdir(int argc, char **argv);
 
 void create_file(int argc, char **argv);
 
+void unlink_file(int argc, char **argv);
+
 void write_file(int argc, char **argv);
 
 void read_file(int argc, char **argv);

@@ -41,7 +41,7 @@ void ls(int argc, char **argv){
 	/* Verificando se alguma flag foi ativa. */
 	int all = 0, list_mode = 0;
 	int c;
-	
+
 	optind = 0;
 	while((c = getopt(argc, argv, "al")) != -1){
 		switch(c){
@@ -56,7 +56,7 @@ void ls(int argc, char **argv){
 				return;
 		}
 	}
-	
+
 	dir_entry_t *dir_entry;
 	if(optind >= argc){
 		dir_entry = search_file(".", ATTR_DIR);
@@ -88,7 +88,7 @@ void ls(int argc, char **argv){
 }
 
 dir_entry_t *create_entry(const char *pathname, uint16_t *cluster_livre, uint8_t attribute, int recursive){
-	/* Se a pasta já existe, então não é preciso fazer nada. */
+	/* Se o arquivo já existe, então não é preciso fazer nada. */
 	dir_entry_t *dir_entry = search_file(pathname, ATTR_DIR);
 	if(dir_entry != NULL){
 		errno = EEXIST;
@@ -99,7 +99,7 @@ dir_entry_t *create_entry(const char *pathname, uint16_t *cluster_livre, uint8_t
 		*cluster_livre = 0;
 		return NULL;
 	}
-	
+
 	/* Separando o caminho do nome do arquivo */
 	char *path;
 	const char *entry_name = strrchr(pathname, '/');
@@ -144,7 +144,7 @@ dir_entry_t *create_entry(const char *pathname, uint16_t *cluster_livre, uint8_t
 			}
 		}
 	}
-	
+
 	/* Encontrando um bloco livre pra adicionar o arquivo. */
 	if((*cluster_livre = fat_get_free_cluster()) == 0xffff){
 		perror("create_entry");
@@ -169,9 +169,9 @@ dir_entry_t *create_entry(const char *pathname, uint16_t *cluster_livre, uint8_t
 
 	/* Atualizando a fat */
 	fat[*cluster_livre] = END_OF_FILE;
-	
+
 	free(path);
-	
+
 	return dir_entry;
 }
 
@@ -179,7 +179,7 @@ void mkdir(int argc, char **argv){
 	/* Verificando se alguma flag foi ativa. */
 	int recursive = 0;
 	int c;
-	
+
 	optind = 0;
 	while((c = getopt(argc, argv, "rp")) != -1){
 		switch(c){
@@ -192,7 +192,7 @@ void mkdir(int argc, char **argv){
 				return;
 		}
 	}
-	
+
 	/* Error checking. */
 	if(optind >= argc){
 		fprintf(stderr, "mkdir: missing operand.\n");
@@ -221,7 +221,7 @@ void create_file(int argc, char **argv){
 	/* Verificando se alguma flag foi ativa. */
 	int recursive = 0;
 	int c;
-	
+
 	optind = 0;
 	while((c = getopt(argc, argv, "rpc:")) != -1){
 		switch(c){
@@ -234,7 +234,7 @@ void create_file(int argc, char **argv){
 				return;
 		}
 	}
-	
+
 	/* Error checking. */
 	if(optind >= argc){
 		fprintf(stderr, "create: missing operand.\n");
@@ -251,11 +251,92 @@ void create_file(int argc, char **argv){
 		perror(argv[1]);
 		return;
 	}
-	
+
 	/* Como o arquivo está inicalmente vazio, então o primeiro caractere é '\0'. */
-	char *data = (char *)read_data_cluster(cluster_livre)->data;
+	char *data = (char *) read_data_cluster(cluster_livre)->data;
 	data[0] = '\0';
 	write_data_cluster(cluster_livre);
+}
+
+void unlink_file(int argc, char **argv){
+	/* Error checking. */
+	if(argc < 2){
+		fprintf(stderr, "unlink: missing operand.\n");
+		return;
+	}
+
+	/* Verifica se o nome do arquivo é . ou .. */
+	if(strcmp(".", argv[1]) == 0 || strcmp("..", argv[1]) == 0){
+		fprintf(stderr, "refusing to remove '.' or '..' directory: skipping '%s'\n", argv[1]);
+		return;
+	}
+
+	/* Verifica se o arquivo existe. */
+	dir_entry_t *dir_entry = search_file(argv[1], ATTR_ANY);
+	if(dir_entry == NULL){
+		perror(argv[1]);
+		return;
+	}
+
+	/* Separando o caminho do nome do arquivo */
+	char *path;
+	const char *entry_name = strrchr(argv[1], '/');
+	if(entry_name == NULL){
+		path = malloc(2);
+		strcpy(path, ".");
+		entry_name = argv[1];
+	}else{
+		size_t path_len = entry_name - argv[1] + 1;
+		path = malloc(path_len + 1);
+		strncpy(path, argv[1], path_len);
+		path[path_len] = '\0';
+		if(path_len > 1){
+			path[path_len - 1] = '\0';
+		}
+	}
+
+	/* Verifica se é um diretório e está vazio. */
+	int i = 0;
+	if(dir_entry->attributes == ATTR_DIR){
+		dir_entry_t *dir = read_data_cluster(dir_entry->first_block)->dir;
+		/* Começa a busca a partir da terceira entrada pois as duas primeiras
+		 * são . e .. e não contam. */
+		for(i = 2; i < ENTRY_BY_CLUSTER; i++){
+			if(dir[i].filename[0] != '\0'){
+				errno = ENOTEMPTY;
+				perror(argv[1]);
+				return;
+			}
+		}
+	}
+
+	/* Atualizando a entrada de diretório */
+	dir_entry_t *parent_dir_entry = search_file(path, ATTR_DIR);
+	/* Error checking. */
+	if(parent_dir_entry == NULL){
+		/* Diretório pai não existe. */
+		perror(path);
+		return;
+	}
+	dir_entry_t *dir = read_data_cluster(parent_dir_entry->first_block)->dir;
+
+	/* Procurando pelo arquivo na entrada de diretório pai. */
+	for(i = 0; i < ENTRY_BY_CLUSTER && strcmp(dir_entry->filename, dir[i].filename) != 0; i++);
+	/* Error checking. */
+	if(i == ENTRY_BY_CLUSTER){
+		errno = ENOENT;
+		perror("unlink");
+		return;
+	}
+
+	/* Um arquivo que tem o primeiro caractere '\0' é considerado apagado apagado. */
+	dir[i].filename[0] = '\0';
+
+	/* Libera os clusters que não serão mais necessários, caso haja algum. */
+	fat_free_cluster(dir_entry->first_block);
+
+	/* Persiste as alterações no disco. */
+	write_data_cluster(parent_dir_entry->first_block);
 }
 
 void write_file(int argc, char **argv){
@@ -264,33 +345,32 @@ void write_file(int argc, char **argv){
 		fprintf(stderr, "write: missing operands: %d.\n", 3 - argc);
 		return;
 	}
-	
+
 	/* Verifica se o arquivo existe. */
 	dir_entry_t *dir_entry = search_file(argv[1], ATTR_FILE);
 	if(dir_entry == NULL){
 		perror(argv[1]);
 		return;
 	}
-	
+
 	/* Calcula a quantidade de clusters necessários para a nova string. */
 	size_t len = strlen(argv[2]) + 1; /* O '\0' precisa entrar na conta. */
 	int num_clusters = (len / CLUSTER_SIZE) + 1;
-	
+
 	/* Atualiza o tamanho do arquivo. */
 	dir_entry->size = num_clusters * CLUSTER_SIZE;
-	
+
 	/* Libera os clusters que não serão mais necessários, caso haja algum. */
 	int i = 0;
-	uint16_t cluster = fat[dir_entry->first_block];
+	uint16_t cluster = dir_entry->first_block;
 	while(i < num_clusters && cluster != END_OF_FILE){
 		cluster = fat[cluster];
 		i++;
-		if(i == num_clusters && cluster != END_OF_FILE){
-			fat_free_cluster(cluster);
-			break;
-		}
 	}
-	
+	if(i == num_clusters && cluster != END_OF_FILE){
+		fat_free_cluster(cluster);
+	}
+
 	/* Escrevendo os dados. */
 	cluster = dir_entry->first_block;
 	char *data = NULL;
@@ -303,16 +383,16 @@ void write_file(int argc, char **argv){
 				perror(argv[1]);
 				return;
 			}
-			
+
 			fat[cluster] = free_cluster;
 			fat[free_cluster] = END_OF_FILE;
 			cluster = fat[cluster];
 		}
-		
-		data = (char *)read_data_cluster(cluster)->data;
+
+		data = (char *) read_data_cluster(cluster)->data;
 		strncpy(data, &argv[2][i * CLUSTER_SIZE], CLUSTER_SIZE);
 		write_data_cluster(cluster);
-		
+
 		cluster = fat[cluster];
 	}
 }
@@ -323,24 +403,24 @@ void read_file(int argc, char **argv){
 		fprintf(stderr, "read: missing file.\n");
 		return;
 	}
-	
+
 	/* Verifica se o arquivo existe. */
 	dir_entry_t *dir_entry = search_file(argv[1], ATTR_FILE);
 	if(dir_entry == NULL){
 		perror(argv[1]);
 		return;
 	}
-	
+
 	/* Lendo os dados. */
 	uint16_t cluster = dir_entry->first_block;
 	char *data = NULL;
 	do{
-		data = (char *)read_data_cluster(cluster)->data;
+		data = (char *) read_data_cluster(cluster)->data;
 		printf("%s", data);
 		cluster = fat[cluster];
 	}while(cluster != END_OF_FILE);
 	printf("\n");
-	
+
 }
 
 void append(int argc, char **argv){
@@ -349,49 +429,56 @@ void append(int argc, char **argv){
 		fprintf(stderr, "append: missing operands: %d.\n", 3 - argc);
 		return;
 	}
-	
+
 	/* Verifica se o arquivo existe. */
 	dir_entry_t *dir_entry = search_file(argv[1], ATTR_FILE);
 	if(dir_entry == NULL){
 		perror(argv[1]);
 		return;
 	}
-	
+
 	char *string = argv[2];
-	
+
 	/* Calcula a quantidade de clusters necessários para a nova string. */
 	size_t len = strlen(string) + 1; /* O '\0' precisa entrar na conta. */
 	int num_clusters = (len / CLUSTER_SIZE) + 1;
-	
+
+	if(len == 1){
+		fprintf(stderr, "append: empty string\n");
+		return;
+	}
+
 	/* Escrevendo os dados. */
 	int i = 0;
 	uint16_t cluster;
 	char *data = NULL;
-	
+
 	/* O append começa a escrever a partir do último cluster. Portanto, é 
 	 * preciso achá-lo e, além disso, descobrir a partir de qual posição do
 	 * cluster será feita a escrita.
 	 */
-	
+
 	/* Encontra o último cluster ocupado. */
 	for(cluster = dir_entry->first_block; fat[cluster] != END_OF_FILE; cluster = fat[cluster]);
 	/* Posição no cluster onde a nova string começará. */
-	data = (char *)read_data_cluster(cluster)->data;
+	data = (char *) read_data_cluster(cluster)->data;
 	int start = strlen(data);
-	
+
 	/* Concatendo as duas strings. */
 	i = 0;
-	do{
-		data[start + i] = *string++;
+	data += start - 1;
+	while(*data != '\0' && start + i < CLUSTER_SIZE){
+		data++;
+		*data = *string++;
 		i++;
-	}while(*string != '\0' && start + i < CLUSTER_SIZE);
+	}
 	write_data_cluster(cluster);
-	
+
 	/* Se a string nova coube no cluster, então não é preciso fazer mais nada. */
 	if(*string == '\0'){
 		return;
 	}
-	
+
 	/* Aloca mais um cluster para o arquivo. */
 	uint16_t free_cluster = fat_get_free_cluster();
 	/* Error checking. */
@@ -403,7 +490,7 @@ void append(int argc, char **argv){
 	fat[free_cluster] = END_OF_FILE;
 	cluster = fat[cluster];
 	dir_entry->size += CLUSTER_SIZE;
-	
+
 	/* Adicionando o resto da string. */
 	for(i = 0; i < num_clusters; i++){
 		/* Se atingiu o último cluster, então aloque mais. */
@@ -416,14 +503,14 @@ void append(int argc, char **argv){
 			}
 			fat[cluster] = free_cluster;
 			fat[free_cluster] = END_OF_FILE;
-			
+
 			dir_entry->size += CLUSTER_SIZE;
 		}
-		
-		data = (char *)read_data_cluster(cluster)->data;
+
+		data = (char *) read_data_cluster(cluster)->data;
 		strncpy(data, &string[i * CLUSTER_SIZE], CLUSTER_SIZE);
 		write_data_cluster(cluster);
-		
+
 		cluster = fat[cluster];
 	}
 }
@@ -431,13 +518,12 @@ void append(int argc, char **argv){
 char **shell_parse_command(char *command, int *argc){
 	/* Removendo os espaços à esquerda. */
 	for(; *command == ' '; command++);
-	
+
 	/* Removendo os espaços à esquerda. */
 	size_t len;
 	for(len = strlen(command) - 1; len >= 0 && command[len] == ' '; command[len--] = '\0');
-	
-	char **argv = malloc(3 * sizeof(char *));
 
+	char **argv = malloc(3 * sizeof(char *));
 	*argc = 1;
 
 	argv[0] = NULL;
@@ -514,7 +600,7 @@ char **shell_parse_command(char *command, int *argc){
 		}
 	}
 	(*argc)++;
-	
+
 	/* Ignorando uma possível / ao final do caminho. */
 	if(*argc > 1){
 		size_t len = strlen(argv[1]);
@@ -534,13 +620,13 @@ void shell_process_command(char* command){
 	/*for(i=0; i<argc; i++){
 		printf("argv[%d]: <%s>\n", i, argv[i]);
 	}*/
-	
+
 	/* Error checking. */
 	if(argv == NULL){
 		perror("shell_process_command");
 		return;
 	}
-	
+
 	if(strcmp("init", argv[0]) == 0){
 		init();
 	}else if(strcmp("load", argv[0]) == 0){
@@ -555,6 +641,8 @@ void shell_process_command(char* command){
 		mkdir(argc, argv);
 	}else if(strcmp("create", argv[0]) == 0){
 		create_file(argc, argv);
+	}else if(strcmp("unlink", argv[0]) == 0){
+		unlink_file(argc, argv);
 	}else if(strcmp("write", argv[0]) == 0){
 		write_file(argc, argv);
 	}else if(strcmp("read", argv[0]) == 0){
