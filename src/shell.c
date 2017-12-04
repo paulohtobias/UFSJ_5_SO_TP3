@@ -38,11 +38,32 @@ void stat(const char *pathname){
 }
 
 void ls(int argc, char **argv){
+	int i;
+	
+	/* Verificando se alguma flag foi ativa. */
+	int all = 0, list_mode = 0;
+	int c;
+	
+	optind = 1;
+	while((c = getopt(argc, argv, "al")) != -1){
+		switch(c){
+			case 'a':
+				all = 1;
+				break;
+			case 'l':
+				list_mode = 1;
+				break;
+			default:
+				fprintf(stderr, "ls: invalid option -- '%c'\n", optopt);
+				return;
+		}
+	}
+	
 	dir_entry_t *dir_entry;
-	if(argc < 2){
+	if(optind >= argc){
 		dir_entry = search_file(".", ATTR_DIR);
 	}else{
-		dir_entry = search_file(argv[1], ATTR_DIR);
+		dir_entry = search_file(argv[optind], ATTR_DIR);
 	}
 
 	/* Error checking. */
@@ -53,22 +74,6 @@ void ls(int argc, char **argv){
 
 	dir_entry_t *dir = read_data_cluster(dir_entry->first_block)->dir;
 
-	int i;
-	/* Verificando se alguma flag foi ativa. */
-	int all = 0, list_mode = 0;
-	if(argc > 2 && argv[2][0] == '-'){
-		for(i=1; argv[2][i] != '\0'; i++){
-			if(argv[2][i] == 'a'){
-				all = 1;
-			}else if(argv[2][i] == 'l'){
-				list_mode = 1;
-			}else{
-				fprintf(stderr, "ls: Unknown option '-%c'.\n", argv[2][i]);
-				return;
-			}
-		}
-	}
-
 	for(i = 0; i < ENTRY_BY_CLUSTER; i++){
 		if(dir[i].filename[0] != '\0' && (all == 1 || dir[i].filename[0] != '.')){
 			if(dir[i].attributes == ATTR_DIR){
@@ -78,7 +83,9 @@ void ls(int argc, char **argv){
 			
 		}
 	}
-	printf("\n");
+	if(!list_mode){
+		printf("\n");
+	}
 }
 
 dir_entry_t *create_entry(const char *pathname, uint16_t *cluster_livre, uint8_t attribute, int recursive){
