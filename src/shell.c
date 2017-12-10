@@ -347,14 +347,14 @@ void write_file(int argc, char **argv){
 	}
 
 	/* Verifica se o arquivo existe. */
-	dir_entry_t *dir_entry = search_file(argv[1], ATTR_FILE);
+	dir_entry_t *dir_entry = search_file(argv[2], ATTR_FILE);
 	if(dir_entry == NULL){
-		perror(argv[1]);
+		perror(argv[2]);
 		return;
 	}
 
 	/* Calcula a quantidade de clusters necessários para a nova string. */
-	size_t len = strlen(argv[2]) + 1; /* O '\0' precisa entrar na conta. */
+	size_t len = strlen(argv[1]) + 1; /* O '\0' precisa entrar na conta. */
 	int num_clusters = (len / CLUSTER_SIZE) + 1;
 
 	/* Atualiza o tamanho do arquivo. */
@@ -380,7 +380,7 @@ void write_file(int argc, char **argv){
 			uint16_t free_cluster = fat_get_free_cluster();
 			/* Error checking. */
 			if(free_cluster == 0xffff){
-				perror(argv[1]);
+				perror(argv[2]);
 				return;
 			}
 
@@ -390,7 +390,7 @@ void write_file(int argc, char **argv){
 		}
 
 		data = (char *) read_data_cluster(cluster)->data;
-		strncpy(data, &argv[2][i * CLUSTER_SIZE], CLUSTER_SIZE);
+		strncpy(data, &argv[1][i * CLUSTER_SIZE], CLUSTER_SIZE);
 		write_data_cluster(cluster);
 
 		cluster = fat[cluster];
@@ -431,13 +431,13 @@ void append(int argc, char **argv){
 	}
 
 	/* Verifica se o arquivo existe. */
-	dir_entry_t *dir_entry = search_file(argv[1], ATTR_FILE);
+	dir_entry_t *dir_entry = search_file(argv[2], ATTR_FILE);
 	if(dir_entry == NULL){
-		perror(argv[1]);
+		perror(argv[2]);
 		return;
 	}
 
-	char *string = argv[2];
+	char *string = argv[1];
 
 	/* Calcula a quantidade de clusters necessários para a nova string. */
 	size_t len = strlen(string) + 1; /* O '\0' precisa entrar na conta. */
