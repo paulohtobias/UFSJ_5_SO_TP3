@@ -1,3 +1,5 @@
+ * mudar o atributo size de um arquivo pra quantidade de bytes que ele ocupa.
+ * criar uma função que recebe um bloco e analisa sua fragmentação.
  * (FEITO) usar argc e argc no ls pra mostrar arquivos "ocultos" e mostrar em lista.
  * (FEITO) manter lista de blocos livres (usar lista encadeada).
  * (FEITO) incluir . e .. na lista de diretórios.

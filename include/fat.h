@@ -118,4 +118,10 @@ void set_entry(dir_entry_t *entry, const char *filename, uint8_t attributes, uin
  */
 dir_entry_t *search_file(const char *pathname, uint8_t attributes);
 
+/**
+ * Mede a fragmentação externa da FAT. Esta medida é dada pela fórmula
+ * 1 - (MAIOR_BLOCO_LIVRE / BLOCOS_LIVRES).
+ */
+void fat_log(void);
+
 #endif /* FAT_H */

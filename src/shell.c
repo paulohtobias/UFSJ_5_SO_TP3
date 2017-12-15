@@ -521,7 +521,7 @@ char **shell_parse_command(char *command, int *argc){
 
 	/* Removendo os espaços à esquerda. */
 	size_t len;
-	for(len = strlen(command) - 1; len >= 0 && command[len] == ' '; command[len--] = '\0');
+	for(len = strlen(command) - 1; len >= 0 && (command[len] == ' ' || command[len] == '\n'); command[len--] = '\0');
 
 	char **argv = malloc(3 * sizeof(char *));
 	*argc = 1;
@@ -658,6 +658,8 @@ void shell_process_command(char* command){
 				printf("%4d: 0x%04x\n", i, fat[i]);
 			}
 		}
+	}else if(strcmp("log", argv[0]) == 0){
+		fat_log();
 	}else{
 		printf("%s: command not found\n", argv[0]);
 	}
