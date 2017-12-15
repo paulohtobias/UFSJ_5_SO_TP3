@@ -232,7 +232,7 @@ dir_entry_t *search_file(const char *pathname, uint8_t attributes){
 void fat_log(void){
 	int i;
 	
-	int free_block_start = FIRST_CLUSTER;
+	int free_block_start = -1;
 	int free_block_length = 0;
 	int largest_free_block = 0;
 	int total_free_memory = 0;
@@ -243,7 +243,7 @@ void fat_log(void){
 				free_block_start = i;
 			}
 			total_free_memory++;
-		}else{
+		}else if(free_block_start != -1){
 			/* Quando uma região ocupada é atingida, o tamanho do bloco livre é
 			 * calculado e é verificado se esta região é a maior.
 			 */
@@ -262,6 +262,9 @@ void fat_log(void){
 	
 	/* Se o último cluster está livre, então é preciso atualizar alguns dados. */
 	if(fat[NUM_CLUSTER - 1] == FREE_CLUSTER){
+		if(free_block_start == -1){
+			free_block_start = i;
+		}
 		free_block_length = i - free_block_start;
 
 		if(free_block_length > largest_free_block){
@@ -273,5 +276,6 @@ void fat_log(void){
 	if(total_free_memory > 0){
 		fragmentation = 1 - ((double) largest_free_block / total_free_memory);
 	}
+	printf("%d\n%d\n", largest_free_block, total_free_memory);
 	printf("%05.2f%%\n", fragmentation * 100);
 }

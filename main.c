@@ -13,7 +13,7 @@ int main(int argc, char *argv[]){
 	char *command = NULL;
 	size_t length;
 	while(1){
-		//printf("\033[1;34m%s $\033[0m ", g_current_dir_name);
+		printf("\033[1;34m%s $\033[0m ", g_current_dir_name);
 		//fread(command, 1, 1023, in);
 		command = NULL;
 		getline(&command, &length, stdin);

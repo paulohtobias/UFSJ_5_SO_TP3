@@ -475,7 +475,7 @@ void append(int argc, char **argv){
 	write_data_cluster(cluster);
 
 	/* Se a string nova coube no cluster, então não é preciso fazer mais nada. */
-	if(*string == '\0'){
+	if(string[-1] == '\0'){
 		return;
 	}
 
@@ -588,12 +588,14 @@ char **shell_parse_command(char *command, int *argc){
 		/* Argumento inválido. */
 		if(state == -1){
 			errno = EINVAL;
+			command = temp;
 			return NULL;
 		}
 		if(state == 0){
 			(*argc)++;
 			if((*argc) == 3){
 				errno = E2BIG;
+				command = temp;
 				return NULL;
 			}
 			j = 0;
