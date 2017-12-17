@@ -119,6 +119,12 @@ void set_entry(dir_entry_t *entry, const char *filename, uint8_t attributes, uin
 dir_entry_t *search_file(const char *pathname, uint8_t attributes);
 
 /**
+ * Calcula em qual bloco o dir_entry_t está. O offset do ponteiro é usado para o
+ * cálculo.
+ */
+uint16_t get_entry_block(dir_entry_t *dir_entry);
+
+/**
  * Mede a fragmentação externa da FAT. Esta medida é dada pela fórmula
  * 1 - (MAIOR_BLOCO_LIVRE / BLOCOS_LIVRES).
  */

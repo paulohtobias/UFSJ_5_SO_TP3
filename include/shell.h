@@ -77,7 +77,7 @@ void append(int argc, char **argv);
 char **shell_parse_command(char *command, int *argc);
 
 /**
- * Separa o comando em (até) 3 strings usando a função shell_parse_command
+ * Separa o comando em até 3 strings usando a função shell_parse_command
  * e chama a função correta.
  */
 void shell_process_command(char *command);

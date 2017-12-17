@@ -30,7 +30,7 @@ void stat(const char *pathname){
 	}
 
 	printf("  File: '%s'\n"
-		"  Size: %d \t Tipo: %s\n"
+		"  Size: %d \t Type: %s\n"
 		"  First Block: 0x%02x (%d)\n",
 		dir_entry->filename, dir_entry->size,
 		(dir_entry->attributes == ATTR_DIR) ? "Directory" : "File",
@@ -164,7 +164,8 @@ dir_entry_t *create_entry(const char *pathname, uint16_t *cluster_livre, uint8_t
 	}
 
 	/* Inserindo o novo diretório dentro do diretório pai. */
-	set_entry(&dir[i], entry_name, attribute, *cluster_livre, CLUSTER_SIZE);
+	uint32_t size = (attribute == ATTR_DIR) ? CLUSTER_SIZE : 0;
+	set_entry(&dir[i], entry_name, attribute, *cluster_livre, size);
 	write_data_cluster(dir_entry->first_block);
 
 	/* Atualizando a fat */
@@ -355,46 +356,49 @@ void write_file(int argc, char **argv){
 
 	/* Calcula a quantidade de clusters necessários para a nova string. */
 	size_t len = strlen(argv[1]) + 1; /* O '\0' precisa entrar na conta. */
-	int num_clusters = (len / CLUSTER_SIZE) + 1;
+	int num_clusters = (len / (CLUSTER_SIZE + 1)) + 1;
 
 	/* Atualiza o tamanho do arquivo. */
-	dir_entry->size = num_clusters * CLUSTER_SIZE;
+	dir_entry->size = len;
 
 	/* Libera os clusters que não serão mais necessários, caso haja algum. */
-	int i = 0;
+	int i = 1;
 	uint16_t cluster = dir_entry->first_block;
-	while(i < num_clusters && cluster != END_OF_FILE){
+	while(i < num_clusters && fat[cluster] != END_OF_FILE){
 		cluster = fat[cluster];
 		i++;
 	}
-	if(i == num_clusters && cluster != END_OF_FILE){
-		fat_free_cluster(cluster);
+	if(i == num_clusters && fat[cluster] != END_OF_FILE){
+		fat_free_cluster(fat[cluster]);
+		fat[cluster] = END_OF_FILE;
 	}
 
 	/* Escrevendo os dados. */
 	cluster = dir_entry->first_block;
 	char *data = NULL;
 	for(i = 0; i < num_clusters; i++){
+		data = (char *) read_data_cluster(cluster)->data;
+		strncpy(data, &argv[1][i * CLUSTER_SIZE], CLUSTER_SIZE);
+		write_data_cluster(cluster);
+		
 		/* Se atingiu o último cluster, então aloque mais. */
-		if(cluster == END_OF_FILE){
+		if(i + 1 < num_clusters && fat[cluster] == END_OF_FILE){
 			uint16_t free_cluster = fat_get_free_cluster();
 			/* Error checking. */
 			if(free_cluster == 0xffff){
 				perror(argv[2]);
-				return;
+				break;
 			}
 
 			fat[cluster] = free_cluster;
 			fat[free_cluster] = END_OF_FILE;
-			cluster = fat[cluster];
 		}
-
-		data = (char *) read_data_cluster(cluster)->data;
-		strncpy(data, &argv[1][i * CLUSTER_SIZE], CLUSTER_SIZE);
-		write_data_cluster(cluster);
 
 		cluster = fat[cluster];
 	}
+	
+	/* Atualiza a entrada de diretório do arquivo, pois seu tamanho foi alterado. */
+	write_data_cluster(get_entry_block(dir_entry));
 }
 
 void read_file(int argc, char **argv){
@@ -416,11 +420,10 @@ void read_file(int argc, char **argv){
 	char *data = NULL;
 	do{
 		data = (char *) read_data_cluster(cluster)->data;
-		printf("%s", data);
+		printf("%.*s", CLUSTER_SIZE, data);
 		cluster = fat[cluster];
 	}while(cluster != END_OF_FILE);
 	printf("\n");
-
 }
 
 void append(int argc, char **argv){
@@ -439,17 +442,7 @@ void append(int argc, char **argv){
 
 	char *string = argv[1];
 
-	/* Calcula a quantidade de clusters necessários para a nova string. */
-	size_t len = strlen(string) + 1; /* O '\0' precisa entrar na conta. */
-	int num_clusters = (len / CLUSTER_SIZE) + 1;
-
-	if(len == 1){
-		fprintf(stderr, "append: empty string\n");
-		return;
-	}
-
 	/* Escrevendo os dados. */
-	int i = 0;
 	uint16_t cluster;
 	char *data = NULL;
 
@@ -463,9 +456,9 @@ void append(int argc, char **argv){
 	/* Posição no cluster onde a nova string começará. */
 	data = (char *) read_data_cluster(cluster)->data;
 	int start = strlen(data);
-
+	
 	/* Concatendo as duas strings. */
-	i = 0;
+	int i = 0;
 	data += start - 1;
 	while(*data != '\0' && start + i < CLUSTER_SIZE){
 		data++;
@@ -473,11 +466,17 @@ void append(int argc, char **argv){
 		i++;
 	}
 	write_data_cluster(cluster);
+	
+	dir_entry->size += i;
 
 	/* Se a string nova coube no cluster, então não é preciso fazer mais nada. */
 	if(string[-1] == '\0'){
 		return;
 	}
+	
+	/* Calcula a quantidade de clusters necessários para a nova string. */
+	size_t len = strlen(string) + 1; /* O '\0' precisa entrar na conta. */
+	int num_clusters = (len / (CLUSTER_SIZE + 1)) + 1;
 
 	/* Aloca mais um cluster para o arquivo. */
 	uint16_t free_cluster = fat_get_free_cluster();
@@ -489,13 +488,12 @@ void append(int argc, char **argv){
 	fat[cluster] = free_cluster;
 	fat[free_cluster] = END_OF_FILE;
 	cluster = fat[cluster];
-	dir_entry->size += CLUSTER_SIZE;
 
 	/* Adicionando o resto da string. */
 	for(i = 0; i < num_clusters; i++){
 		/* Se atingiu o último cluster, então aloque mais. */
-		if(cluster == END_OF_FILE){
-			uint16_t free_cluster = fat_get_free_cluster();
+		if(i + 1 < num_clusters && fat[cluster] == END_OF_FILE){
+			free_cluster = fat_get_free_cluster();
 			/* Error checking. */
 			if(free_cluster == 0xffff){
 				perror(argv[1]);
@@ -503,13 +501,12 @@ void append(int argc, char **argv){
 			}
 			fat[cluster] = free_cluster;
 			fat[free_cluster] = END_OF_FILE;
-
-			dir_entry->size += CLUSTER_SIZE;
 		}
 
 		data = (char *) read_data_cluster(cluster)->data;
 		strncpy(data, &string[i * CLUSTER_SIZE], CLUSTER_SIZE);
 		write_data_cluster(cluster);
+		dir_entry->size += strlen(data);
 
 		cluster = fat[cluster];
 	}
@@ -551,12 +548,13 @@ char **shell_parse_command(char *command, int *argc){
 	};
 	int state = 0;
 
-	int i, j = 0;
+	int i, j = 0, k = 0;
 	for(i = 0; command[i] != '\0'; i++){
 		/* Aloca mais um argumento, caso necessário. */
 		if(argv[(*argc)] == NULL){
 			argv[(*argc)] = malloc(1024); /* Tamanho escolhido abitrariamente. */
 			argv[(*argc)][0] = '\0';
+			k = 1;
 		}
 
 		/*
@@ -580,6 +578,12 @@ char **shell_parse_command(char *command, int *argc){
 		if(s == 3 || state == DFA[state][s]){
 			argv[(*argc)][j++] = command[i];
 			argv[(*argc)][j] = '\0'; /* Garantindo que terá um \0 no final da string. */
+			
+			/* Alocando mais espaço, caso necessário. */
+			if(j % 1023 == 0){
+				k++;
+				argv[(*argc)] = realloc(argv[(*argc)], k * 1024);
+			}
 		}
 
 		/* Faz a transição no autômato. */

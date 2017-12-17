@@ -151,7 +151,7 @@ dir_entry_t *search_file(const char *pathname, uint8_t attributes){
 		return NULL;
 	}
 
-	/* Se paathname for '/', então não precisa ser procurado. */
+	/* Se pathname for '/', então não precisa ser procurado. */
 	if(strcmp(pathname, "/") == 0){
 		return &root_dir[0];
 	}
@@ -227,6 +227,17 @@ dir_entry_t *search_file(const char *pathname, uint8_t attributes){
 
 	errno = ENOENT;
 	return NULL;
+}
+
+uint16_t get_entry_block(dir_entry_t *dir_entry){
+	/* Verifica se o dir_entry está no root_dir. */
+	if((dir_entry > &root_dir[0]) && (dir_entry <= &root_dir[ENTRY_BY_CLUSTER - 1])){
+		return ((dir_entry - root_dir) / 32) + 0x09;
+	}
+	/* Se não estiver, então está no vetor global de clusters. */
+	else{
+		return ((dir_entry - clusters[0].dir) / 32) + 0x0a;
+	}
 }
 
 void fat_log(void){
