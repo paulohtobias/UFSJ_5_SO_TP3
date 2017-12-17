@@ -456,15 +456,15 @@ void append(int argc, char **argv){
 	/* Posição no cluster onde a nova string começará. */
 	data = (char *) read_data_cluster(cluster)->data;
 	int start = strlen(data);
-	
+
 	/* Concatendo as duas strings. */
 	int i = 0;
 	data += start - 1;
-	while(*data != '\0' && start + i < CLUSTER_SIZE){
+	do{
 		data++;
 		*data = *string++;
 		i++;
-	}
+	}while((*data != '\0' && start + i < CLUSTER_SIZE));
 	write_data_cluster(cluster);
 	
 	dir_entry->size += i;
