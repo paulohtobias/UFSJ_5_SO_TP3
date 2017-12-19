@@ -3,11 +3,7 @@ CC = gcc
 CFLAGS = -g -Wall -MMD
 
 #Binary
-ifeq ($(OS),Windows_NT)
-    BIN = main.exe
-else
-    BIN = main.out
-endif
+BIN = main.out
 
 #Directories
 IDIR = ./include
@@ -52,14 +48,12 @@ $(ODIR)/%.o: $(SDIR)/%$(SOURCE)
 
 .PHONY : clean
 clean :
-	-rm $(BIN) $(OBJS) $(DEPS)
+	-rm $(BIN) *.d $(ODIR)/*
 
 init:
-	mkdir include
-	mkdir src
-	mkdir obj
-	mkdir "obj/windows"
-	mkdir "obj/linux"
+	mkdir -p include
+	mkdir -p src
+	mkdir -p obj
 
 run:
 	./$(BIN)
